@@ -36,6 +36,7 @@ defmodule Aquila.Engine do
       pending_calls: [],
       acc_chunks: [],
       raw_events: [],
+      tool_context: nil,
       response_id: nil,
       previous_response_id: nil,
       status: :in_progress,
@@ -83,6 +84,7 @@ defmodule Aquila.Engine do
     instructions = opts[:instructions] || opts[:instruction]
     previous_response_id = opts[:previous_response_id] || opts[:response_id]
     store = Keyword.get(opts, :store)
+    tool_context = Keyword.get(opts, :tool_context)
 
     telemetry_meta = %{endpoint: endpoint, model: to_string(model), stream?: stream?}
     telemetry = %{start_time: System.monotonic_time(), meta: telemetry_meta}
@@ -105,6 +107,7 @@ defmodule Aquila.Engine do
       tools: tools,
       tool_defs: tool_defs,
       tool_map: tool_map,
+      tool_context: tool_context,
       previous_response_id: previous_response_id,
       telemetry: telemetry
     }
@@ -297,7 +300,7 @@ defmodule Aquila.Engine do
 
     result =
       try do
-        tool.fun.(args)
+        invoke_tool_fun(tool.fun, args, state.tool_context)
       rescue
         exception ->
           Sink.notify(state.sink, {:error, %{tool: call.name, error: exception}}, state.ref)
@@ -323,6 +326,9 @@ defmodule Aquila.Engine do
 
     {payload, new_messages}
   end
+
+  defp invoke_tool_fun(fun, args, context) when is_function(fun, 2), do: fun.(args, context)
+  defp invoke_tool_fun(fun, args, _context) when is_function(fun, 1), do: fun.(args)
 
   defp parse_args(nil), do: %{}
 

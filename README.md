@@ -14,6 +14,8 @@ mythological lineup.
 - **Tool calling that just works** – declare tools with `Aquila.Tool.new/3` and
   Aquila will decode arguments, execute your callback, and feed the output back
   to the model.
+- **Context-aware tools** – supply `tool_context:` when calling Aquila so your
+  tool callbacks receive application state alongside model arguments.
 - **Streaming sinks** – pipe events into LiveView, GenServers, controllers, or custom
   callbacks with `Aquila.Sink`. Telemetry events are emitted for start, chunk,
   tool invocation, and completion.
@@ -124,11 +126,15 @@ stay deterministic even while exercising retrieval workflows.
 summarise =
   Aquila.Tool.new("summarise",
     parameters: %{
-      "type" => "object",
-      "properties" => %{ "text" => %{ "type" => "string" } },
-      "required" => ["text"]
+      type: :object,
+      properties: %{
+        text: %{type: :string, required: true, description: "Text to summarise"},
+        max_sentences: %{type: :integer}
+      }
     },
-    fn %{"text" => text} -> %{summary: Text.summary(text)} end
+    fn %{"text" => text, "max_sentences" => limit}, _ctx ->
+      %{summary: Text.summary(text, sentences: limit || 3)}
+    end
   )
 
 Aquila.ask("Summarise the attached text", tools: [summarise])
@@ -137,6 +143,11 @@ Aquila.ask("Summarise the attached text", tools: [summarise])
 When the Responses API requests action, Aquila streams tool-call fragments,
 executes the callback, and continues the conversation using the returned
 `response_id`, letting you swap instructions mid-thread.
+
+Pass `tool_context:` when calling `Aquila.ask/2` or `Aquila.stream/2` to supply
+application state (current user, DB repos, etc.) that will be injected as the
+second argument to each tool callback. Leave the option unset and existing
+arity-1 tools keep working unchanged.
 
 ## Streaming Sinks & Telemetry
 

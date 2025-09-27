@@ -14,7 +14,7 @@ defmodule Aquila.Tool do
           name: String.t(),
           description: String.t() | nil,
           parameters: map(),
-          fun: (map() -> map() | String.t())
+          fun: (map() -> any()) | (map(), any() -> any())
         }
 
   @doc """
@@ -30,17 +30,21 @@ defmodule Aquila.Tool do
   """
   @spec new(String.t(), (map() -> any())) :: t()
   def new(name, fun) when is_function(fun, 1), do: new(name, [], fun)
+  def new(name, fun) when is_function(fun, 2), do: new(name, [], fun)
 
   @spec new(String.t(), keyword(), (map() -> any())) :: t()
-  def new(name, opts, fun) when is_binary(name) and is_function(fun, 1) do
+  def new(name, opts, fun)
+      when is_binary(name) and (is_function(fun, 1) or is_function(fun, 2)) do
     parameters =
       Keyword.get(opts, :parameters) ||
         raise ArgumentError, "tool requires :parameters (JSON schema map)"
 
+    normalized_parameters = normalize_parameters(parameters)
+
     struct!(__MODULE__,
       name: name,
       description: Keyword.get(opts, :description),
-      parameters: parameters,
+      parameters: normalized_parameters,
       fun: fun
     )
   end
@@ -89,4 +93,108 @@ defmodule Aquila.Tool do
 
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  defp normalize_parameters(%{} = params) do
+    if string_key_map?(params) do
+      params
+    else
+      {normalized, required} = normalize_schema(params)
+
+      if required == [] do
+        normalized
+      else
+        Map.put(normalized, "required", Enum.uniq(required))
+      end
+    end
+  end
+
+  defp normalize_parameters(other), do: other
+
+  defp string_key_map?(map) do
+    Enum.all?(Map.keys(map), &is_binary/1)
+  end
+
+  defp normalize_schema(value) when is_map(value) do
+    if string_key_map?(value) do
+      {value, []}
+    else
+      {normalized, required} =
+        Enum.reduce(value, {%{}, []}, fn {key, val}, {acc, reqs} ->
+          key_string = key_to_string(key)
+
+          case key_string do
+            "properties" ->
+              {props, prop_required} = normalize_properties(val)
+              {Map.put(acc, "properties", props), reqs ++ prop_required}
+
+            _ ->
+              {normalized_val, _} = normalize_schema(val)
+              {Map.put(acc, key_string, normalized_val), reqs}
+          end
+        end)
+
+      normalized =
+        if required == [] do
+          normalized
+        else
+          Map.put(normalized, "required", Enum.uniq(required))
+        end
+
+      {normalized, []}
+    end
+  end
+
+  defp normalize_schema(list) when is_list(list) do
+    {normalized_list, _} =
+      Enum.map_reduce(list, [], fn item, acc ->
+        {normalized, _} = normalize_schema(item)
+        {normalized, acc}
+      end)
+
+    {normalized_list, []}
+  end
+
+  defp normalize_schema(value) when is_atom(value) do
+    if value in [true, false, nil] do
+      {value, []}
+    else
+      {Atom.to_string(value), []}
+    end
+  end
+
+  defp normalize_schema(other), do: {other, []}
+
+  defp normalize_properties(%{} = props) do
+    Enum.reduce(props, {%{}, []}, fn {name, schema}, {acc, reqs} ->
+      {required?, schema_without_flag} = extract_required(schema)
+      {normalized_schema, _} = normalize_schema(schema_without_flag)
+      prop_name = key_to_string(name)
+
+      acc = Map.put(acc, prop_name, normalized_schema)
+      reqs = if required?, do: [prop_name | reqs], else: reqs
+
+      {acc, reqs}
+    end)
+  end
+
+  defp normalize_properties(other), do: {other, []}
+
+  defp extract_required(%{} = schema) do
+    cond do
+      Map.has_key?(schema, :required) and is_boolean(schema[:required]) ->
+        {schema[:required], Map.delete(schema, :required)}
+
+      Map.has_key?(schema, "required") and is_boolean(schema["required"]) ->
+        {schema["required"], Map.delete(schema, "required")}
+
+      true ->
+        {false, schema}
+    end
+  end
+
+  defp extract_required(other), do: {false, other}
+
+  defp key_to_string(key) when is_atom(key), do: Atom.to_string(key)
+  defp key_to_string(key) when is_binary(key), do: key
+  defp key_to_string(key), do: to_string(key)
 end

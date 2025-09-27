@@ -93,7 +93,12 @@ defmodule Aquila.EngineInternalTest do
     tool =
       Aquila.Tool.new(
         "adder",
-        [parameters: %{"type" => "object", "properties" => %{}, "required" => []}],
+        [
+          parameters: %{
+            type: :object,
+            properties: %{a: %{type: :integer}, b: %{type: :integer}}
+          }
+        ],
         fn _ -> %{sum: 3} end
       )
 
@@ -120,6 +125,52 @@ defmodule Aquila.EngineInternalTest do
     assert response.text == "Result: 3"
     [%{name: "adder"} = call | _] = response.meta[:tool_calls]
     assert call[:call_id] == "call_1"
+  end
+
+  test "tool context is passed to callback" do
+    parent = self()
+
+    tool =
+      Aquila.Tool.new(
+        "echo",
+        [
+          parameters: %{
+            type: :object,
+            properties: %{message: %{type: :string, required: true}}
+          }
+        ],
+        fn args, ctx ->
+          send(parent, {:tool_context, ctx})
+          %{echo: args["message"]}
+        end
+      )
+
+    ScriptedTransport.put_events([
+      %{
+        type: :tool_call,
+        id: "call_1",
+        call_id: "call_1",
+        name: "echo",
+        args_fragment: ~s({"message":"hi"})
+      },
+      %{
+        type: :tool_call_end,
+        id: "call_1",
+        call_id: "call_1",
+        name: "echo",
+        args: %{"message" => "hi"}
+      },
+      %{type: :done, status: :requires_action, meta: %{}},
+      %{type: :delta, content: "Echo"},
+      %{type: :done, status: :completed, meta: %{}}
+    ])
+
+    context = %{current_user: 123}
+
+    _response =
+      Aquila.ask("echo", tools: [tool], tool_context: context, transport: ScriptedTransport)
+
+    assert_receive {:tool_context, ^context}
   end
 
   test "fetch_full_response is used when streaming yields no chunks" do

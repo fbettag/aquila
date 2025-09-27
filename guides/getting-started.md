@@ -134,12 +134,28 @@ Attach custom tools via `Aquila.Tool.new/3`. The engine will call your function
 when the model returns a tool invocation and stream any follow-up responses.
 
 ```elixir
-sum = Aquila.Tool.new("sum", parameters: %{type: "object"}, fn %{"a" => a, "b" => b} ->
-  %{result: a + b}
-end)
+sum =
+  Aquila.Tool.new(
+    "sum",
+    parameters: %{
+      type: :object,
+      properties: %{
+        a: %{type: :number, required: true},
+        b: %{type: :number, required: true}
+      }
+    },
+    fn %{"a" => a, "b" => b}, _ctx ->
+      %{result: a + b}
+    end
+  )
 
 Aquila.ask("Add 2 and 3", tools: [sum])
 ```
+
+Need access to application state inside a tool? Pass `tool_context:` when
+calling `Aquila.ask/2` or `Aquila.stream/2` and define your callbacks with two
+arguments (`fn args, ctx -> ... end`). The context value is forwarded as the
+second argument while existing single-arity callbacks keep working.
 
 ## Using LiteLLM for Other Providers
 
