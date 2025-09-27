@@ -1,0 +1,32 @@
+{
+	"name": "aquila Dev Container",
+	"dockerFile": "Dockerfile",
+	"workspaceFolder": "/workspace",
+	"workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+
+	// Configure tool-specific properties.
+	"customizations": {
+		// Configure properties specific to VS Code.
+		"vscode": {
+			// Add the IDs of extensions you want installed when the container is created.
+			"extensions": [
+				"JakeBecker.elixir-ls",
+				"ms-azuretools.vscode-docker",
+				"phoenixframework.phoenix",
+				"ritvyk.heex-html",
+				"GitLab.gitlab-workflow",
+				"openai.chatgpt",
+				"anthropic.claude-code"
+			]
+		}
+	},
+
+	// Use 'postCreateCommand' to run commands after the container is created.
+	"postCreateCommand": ".devcontainer/setup.sh",
+
+	"features": {
+		"ghcr.io/jungaretti/features/make:1": {},
+		"ghcr.io/devcontainers/features/node:1": {},
+		"ghcr.io/devcontainers/features/rust:1": {}
+	}
+}
