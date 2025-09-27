@@ -1,0 +1,29 @@
+{
+  "endpoint": "responses",
+  "url": "https://api.openai.com/v1/responses",
+  "model": "gpt-4o-mini",
+  "body_hash": "29739500c11d66d418cb1125aafca73d69daf52c08a501753c2e72f67fd49415",
+  "body": {
+    "model": "gpt-4o-mini",
+    "input": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "input_text",
+            "text": "Reply with the word 'pong'."
+          }
+        ]
+      }
+    ],
+    "tools": [],
+    "metadata": {},
+    "stream": true
+  },
+  "headers": [
+    [
+      "content-type",
+      "application/json"
+    ]
+  ]
+}

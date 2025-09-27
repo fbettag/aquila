@@ -1,0 +1,24 @@
+{
+  "body": {
+    "metadata": {},
+    "model": "gpt-4o-mini",
+    "previous_response_id": "resp_123",
+    "stream": true,
+    "tool_outputs": [
+      {
+        "output": "{\"sum\":5}",
+        "tool_call_id": "call_1"
+      }
+    ]
+  },
+  "body_hash": "0c865a885722e9e88397d85749d1cded9fbf311b6ede55afc589fe5c4236ae4e",
+  "endpoint": "responses",
+  "headers": [
+    [
+      "content-type",
+      "application/json"
+    ]
+  ],
+  "model": "gpt-4o-mini",
+  "url": "https://api.openai.com/v1/responses"
+}

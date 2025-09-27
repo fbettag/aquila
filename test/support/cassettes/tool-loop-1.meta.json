@@ -1,0 +1,52 @@
+{
+  "body": {
+    "input": [
+      {
+        "content": [
+          {
+            "text": "compute",
+            "type": "input_text"
+          }
+        ],
+        "role": "user"
+      }
+    ],
+    "metadata": {},
+    "model": "gpt-4o-mini",
+    "stream": true,
+    "tools": [
+      {
+        "function": {
+          "description": "Adds two numbers",
+          "name": "add",
+          "parameters": {
+            "properties": {
+              "a": {
+                "type": "number"
+              },
+              "b": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "a",
+              "b"
+            ],
+            "type": "object"
+          }
+        },
+        "type": "function"
+      }
+    ]
+  },
+  "body_hash": "c0771532a33441eede7e439a4cfe0ff3bf718f7bffe5f5fd5b37ba4bf561f881",
+  "endpoint": "responses",
+  "headers": [
+    [
+      "content-type",
+      "application/json"
+    ]
+  ],
+  "model": "gpt-4o-mini",
+  "url": "https://api.openai.com/v1/responses"
+}

@@ -1,0 +1,4 @@
+{"type":"response_ref","id":"resp_123"}
+{"type":"tool_call","id":"call_1","name":"add","args_fragment":"{\"a\":2,\"b\":3}"}
+{"type":"tool_call_end","id":"call_1","name":"add","args":{"a":2,"b":3},"call_id":"call_1"}
+{"type":"done","status":"requires_action"}

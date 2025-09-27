@@ -1,0 +1,29 @@
+{
+  "body": {
+    "input": [
+      {
+        "content": [
+          {
+            "text": "Hello",
+            "type": "input_text"
+          }
+        ],
+        "role": "user"
+      }
+    ],
+    "metadata": {},
+    "model": "gpt-4o-mini",
+    "stream": true,
+    "tools": []
+  },
+  "body_hash": "72c3b5db38e532f01ae6cc1ab17bde0bc42cfc0b566d7c557689f50a5e4c38d3",
+  "endpoint": "responses",
+  "headers": [
+    [
+      "content-type",
+      "application/json"
+    ]
+  ],
+  "model": "gpt-4o-mini",
+  "url": "https://api.openai.com/v1/responses"
+}

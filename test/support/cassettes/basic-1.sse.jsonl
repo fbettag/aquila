@@ -1,0 +1,3 @@
+{"type":"delta","content":"Hello"}
+{"type":"delta","content":" world"}
+{"type":"done","status":"completed","meta":{"usage":{"prompt_tokens":5,"completion_tokens":2}}}

@@ -1,0 +1,29 @@
+{
+  "body": {
+    "input": [
+      {
+        "content": [
+          {
+            "text": "Stream me",
+            "type": "input_text"
+          }
+        ],
+        "role": "user"
+      }
+    ],
+    "metadata": {},
+    "model": "gpt-4o-mini",
+    "stream": true,
+    "tools": []
+  },
+  "body_hash": "e2509c9b9b522eb2f8a48745f21df1fc098578d835504046da8ecb0680f7ca6a",
+  "endpoint": "responses",
+  "headers": [
+    [
+      "content-type",
+      "application/json"
+    ]
+  ],
+  "model": "gpt-4o-mini",
+  "url": "https://api.openai.com/v1/responses"
+}

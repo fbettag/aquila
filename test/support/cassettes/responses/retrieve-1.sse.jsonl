@@ -1,0 +1,11 @@
+{"id":"resp_68d82e55a21c819ea9d0c1fa44e904dc000376f3cc43d62f","type":"response_ref"}
+{"content":"Hello","type":"delta"}
+{"content":"!","type":"delta"}
+{"content":" Today","type":"delta"}
+{"content":" is","type":"delta"}
+{"content":" ","type":"delta"}
+{"content":"202","type":"delta"}
+{"content":"3","type":"delta"}
+{"content":".","type":"delta"}
+{"content":"Hello! Today is 2023.","type":"delta"}
+{"meta":{"id":"resp_68d82e55a21c819ea9d0c1fa44e904dc000376f3cc43d62f","status":"completed","metadata":{},"usage":{"input_tokens":21,"input_tokens_details":{"cached_tokens":0},"output_tokens":9,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":30},"_fallback_text":"Hello! Today is 2023."},"status":"completed","type":"done"}

@@ -1,0 +1,18 @@
+{
+  "body": null,
+  "url": "https://api.openai.com/v1/responses/resp_68d82e55a21c819ea9d0c1fa44e904dc000376f3cc43d62f",
+  "headers": [
+    [
+      "content-type",
+      "application/json"
+    ],
+    [
+      "authorization",
+      "[redacted]"
+    ]
+  ],
+  "method": "delete",
+  "endpoint": "responses",
+  "body_hash": "b0120e048b7bd974a685c0b2f5de921ead18673b221c1afb5481ed0abd184e59",
+  "model": null
+}
