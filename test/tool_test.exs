@@ -72,4 +72,36 @@ defmodule Aquila.ToolTest do
     assert bar_schema["type"] == "integer"
     assert tool.parameters["required"] == ["foo"]
   end
+
+  test "normalizes nested array schemas" do
+    schema = %{
+      type: :object,
+      properties: %{
+        messages: %{
+          type: :array,
+          required: true,
+          items: %{
+            type: :object,
+            properties: %{
+              role: %{type: :string, required: true},
+              content: %{type: :string}
+            }
+          }
+        }
+      }
+    }
+
+    tool = Tool.new("array", [parameters: schema], fn _ -> :ok end)
+
+    params = tool.parameters
+    assert params["required"] == ["messages"]
+
+    messages_schema = params["properties"]["messages"]
+    assert messages_schema["type"] == "array"
+
+    items_schema = messages_schema["items"]
+    assert items_schema["type"] == "object"
+    assert items_schema["required"] == ["role"]
+    assert items_schema["properties"]["role"]["type"] == "string"
+  end
 end

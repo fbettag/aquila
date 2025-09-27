@@ -157,6 +157,33 @@ calling `Aquila.ask/2` or `Aquila.stream/2` and define your callbacks with two
 arguments (`fn args, ctx -> ... end`). The context value is forwarded as the
 second argument while existing single-arity callbacks keep working.
 
+Schemas can stay idiomatic Elixir even when they include arrays or nested
+objects—just use atom keys and optional `:required` booleans:
+
+```elixir
+chat_history =
+  Aquila.Tool.new(
+    "chat_history",
+    parameters: %{
+      type: :object,
+      properties: %{
+        messages: %{
+          type: :array,
+          required: true,
+          items: %{
+            type: :object,
+            properties: %{
+              role: %{type: :string, required: true},
+              content: %{type: :string, required: true}
+            }
+          }
+        }
+      }
+    },
+    fn %{"messages" => messages}, _ctx -> persist(messages) end
+  )
+```
+
 ## Using LiteLLM for Other Providers
 
 If you need to reach non-OpenAI providers, deploy
