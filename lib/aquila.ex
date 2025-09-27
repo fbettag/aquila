@@ -31,8 +31,7 @@ defmodule Aquila do
   their native APIs.
   """
 
-  alias Aquila.Engine
-  alias Aquila.Response
+  alias Aquila.{Cassette, Engine, Response}
 
   @typedoc "Supported prompt shapes for `ask/2` and `stream/2`."
   @type prompt :: iodata() | [Aquila.Message.t()]
@@ -74,7 +73,12 @@ defmodule Aquila do
   """
   @spec ask(prompt(), options()) :: Response.t()
   def ask(input, opts \\ []) do
-    Engine.run(input, Keyword.put_new(opts, :stream, false))
+    opts =
+      opts
+      |> apply_cassette_defaults()
+      |> Keyword.put_new(:stream, false)
+
+    Engine.run(input, opts)
   end
 
   @doc """
@@ -103,7 +107,12 @@ defmodule Aquila do
   """
   @spec stream(prompt(), options()) :: {:ok, reference()} | {:error, term()}
   def stream(input, opts \\ []) do
-    Engine.run(input, Keyword.put(opts, :stream, true))
+    opts =
+      opts
+      |> apply_cassette_defaults()
+      |> Keyword.put(:stream, true)
+
+    Engine.run(input, opts)
   end
 
   @doc """
@@ -132,6 +141,8 @@ defmodule Aquila do
   """
   @spec retrieve_response(String.t(), options()) :: {:ok, Response.t()} | {:error, term()}
   def retrieve_response(response_id, opts \\ []) when is_binary(response_id) do
+    opts = apply_cassette_defaults(opts)
+
     with {:ok, body} <- dispatch_http(:get, response_id, opts) do
       {:ok, response_from_body(body)}
     end
@@ -150,6 +161,7 @@ defmodule Aquila do
   """
   @spec delete_response(String.t(), options()) :: {:ok, map()} | {:error, term()}
   def delete_response(response_id, opts \\ []) when is_binary(response_id) do
+    opts = apply_cassette_defaults(opts)
     dispatch_http(:delete, response_id, opts)
   end
 
@@ -448,6 +460,28 @@ defmodule Aquila do
   defp normalize_http_client!(fun) do
     raise ArgumentError,
           ":http_client must be a function accepting (url, options). Got: #{inspect(fun)}"
+  end
+
+  defp apply_cassette_defaults(opts) when is_list(opts) do
+    cond do
+      Keyword.has_key?(opts, :cassette) -> opts
+      cassette = Cassette.current() -> merge_cassette_opts(opts, cassette)
+      true -> opts
+    end
+  end
+
+  defp merge_cassette_opts(opts, {name, cassette_opts}) do
+    opts
+    |> put_cassette_name(name)
+    |> put_missing_opts(cassette_opts)
+  end
+
+  defp put_cassette_name(opts, name), do: Keyword.put(opts, :cassette, name)
+
+  defp put_missing_opts(opts, cassette_opts) do
+    Enum.reduce(cassette_opts, opts, fn {key, value}, acc ->
+      Keyword.put_new(acc, key, value)
+    end)
   end
 
   defp config(key) do

@@ -36,23 +36,32 @@ config :aquila, :recorder,
 ## Writing Tests
 
 ```elixir
-setup :verify_on_exit!
-setup :set_mox_global
-
-setup do
-  Application.put_env(:aquila, :transport, Aquila.Transport.Record)
-  :ok
-end
+use Aquila.Cassette
 
 @test "streams deterministic chunks" do
-  {:ok, ref} = Aquila.stream("hello", cassette: "greetings")
-  assert_receive {:aquila_chunk, chunk, ^ref}
-  assert chunk =~ "hi"
+  aquila_cassette "greetings" do
+    {:ok, ref} = Aquila.stream("hello")
+    assert_receive {:aquila_chunk, chunk, ^ref}
+    assert chunk =~ "hi"
+  end
 end
 ```
 
+`aquila_cassette/3` stores the cassette name in the process dictionary so any
+nested Aquila calls (even deep inside LiveView helpers) inherit it
+automatically. Pass additional options—such as `cassette_index:`—to the macro
+when you need to target a specific fixture.
+
+If you introduce Mox-powered doubles for transports or sinks, add
+`setup :verify_on_exit!` / `setup :set_mox_global` inside that specific test
+module. Plain cassette-backed tests do not need them.
+
 Recording should happen inside the test environment so your dev runtime remains
-live-call free. When you need to refresh fixtures, run the affected tests with a
+live-call free. For most suites the `config/test.exs` snippet above is enough—no
+additional `Application.put_env/3` calls or Mox boilerplate are required unless
+you override transports within an individual test.
+
+When you need to refresh fixtures, run the affected tests with a
 real `OPENAI_API_KEY` available. `Record` will detect missing or stale
 cassettes, proxy the request to the configured OpenAI transport (redacting
 Authorization headers automatically), store the new fixtures, and replay them

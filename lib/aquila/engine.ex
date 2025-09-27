@@ -27,6 +27,7 @@ defmodule Aquila.Engine do
       :ref,
       :timeout,
       :cassette,
+      :cassette_index,
       :store,
       messages: [],
       tools: [],
@@ -81,6 +82,7 @@ defmodule Aquila.Engine do
     tool_map = build_tool_map(tools)
     ref = Keyword.get(opts, :ref, make_ref())
     cassette = Keyword.get(opts, :cassette)
+    cassette_index = Keyword.get(opts, :cassette_index)
     instructions = opts[:instructions] || opts[:instruction]
     previous_response_id = opts[:previous_response_id] || opts[:response_id]
     store = Keyword.get(opts, :store)
@@ -102,6 +104,7 @@ defmodule Aquila.Engine do
       ref: ref,
       timeout: timeout,
       cassette: cassette,
+      cassette_index: cassette_index,
       store: store,
       messages: messages,
       tools: tools,
@@ -435,10 +438,11 @@ defmodule Aquila.Engine do
     trimmed <> "/responses"
   end
 
-  defp http_opts(%State{timeout: timeout, cassette: nil}), do: [receive_timeout: timeout]
-
-  defp http_opts(%State{timeout: timeout, cassette: cassette}) do
-    [receive_timeout: timeout, cassette: cassette]
+  defp http_opts(%State{timeout: timeout, cassette: cassette, cassette_index: index}) do
+    opts = [receive_timeout: timeout]
+    opts = if cassette, do: Keyword.put(opts, :cassette, cassette), else: opts
+    opts = if index, do: Keyword.put(opts, :cassette_index, index), else: opts
+    opts
   end
 
   defp build_headers(nil), do: [{"content-type", "application/json"}]
