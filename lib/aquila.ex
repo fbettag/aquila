@@ -38,6 +38,8 @@ defmodule Aquila do
   @type prompt :: iodata() | [Aquila.Message.t()]
   @typedoc "Shared option keyword list for public API functions."
   @type options :: keyword()
+  @typedoc "Returned transcription payload when using `transcribe_audio/2`."
+  @type transcription_result :: String.t() | map() | list()
 
   @doc """
   Executes the request and waits for a complete `%Aquila.Response{}`.
@@ -151,6 +153,48 @@ defmodule Aquila do
     dispatch_http(:delete, response_id, opts)
   end
 
+  @doc """
+  Transcribes an audio file using the configured OpenAI audio endpoint.
+
+  The helper reads the file from disk, builds a multipart request, and sends
+  it to `/audio/transcriptions` using the configured base URL and API key.
+  Successful calls return the decoded transcription text by default. Use the
+  `:raw` option when you need the original response body (for example when
+  requesting `json` or `verbose_json` formats).
+
+  ## Options
+
+  * `:model` – override the configured transcription model.
+  * `:response_format` – format accepted by the API (defaults to `"text"`).
+  * `:headers` – additional headers appended to the request.
+  * `:form_fields` – keyword list of extra multipart fields (e.g. `[{temperature, 0}]`).
+  * `:filename` – override the filename metadata sent with the upload.
+  * `:content_type` – override the MIME type (defaults to `MIME.from_path/1`).
+  * `:base_url` – target a different endpoint (defaults to configured base URL).
+  * `:api_key` – provide an API key explicitly.
+  * `:req_options` – keyword list merged into the `Req.post/2` call.
+  * `:http_client` – two-argument function invoked instead of `&Req.post/2`.
+  * `:raw` – when `true`, return the provider response without formatting.
+
+  ## Examples
+
+      iex> Aquila.transcribe_audio("/tmp/sample.webm", model: "gpt-4o-mini-transcribe")
+      {:ok, "Hello from Aquila"}
+  """
+  @spec transcribe_audio(Path.t(), keyword()) :: {:ok, transcription_result()} | {:error, term()}
+  def transcribe_audio(file_path, opts \\ []) when is_binary(file_path) do
+    with {:ok, payload} <- File.read(file_path),
+         {:ok, api_key} <- fetch_api_key(opts),
+         {:ok, body} <-
+           request_transcription(
+             payload,
+             file_path,
+             Keyword.put(opts, :api_key, api_key)
+           ) do
+      format_transcription_body(body, opts)
+    end
+  end
+
   defp dispatch_http(method, response_id, opts) do
     transport =
       Keyword.get(opts, :transport) ||
@@ -258,6 +302,153 @@ defmodule Aquila do
   defp resolve_api_key({:system, var}) when is_binary(var), do: System.get_env(var)
   defp resolve_api_key(key) when is_binary(key), do: key
   defp resolve_api_key(_), do: nil
+
+  defp fetch_api_key(opts) do
+    opts
+    |> Keyword.get(:api_key)
+    |> case do
+      nil -> config(:api_key)
+      key -> key
+    end
+    |> resolve_api_key()
+    |> case do
+      nil -> {:error, :missing_api_key}
+      api_key -> {:ok, api_key}
+    end
+  end
+
+  defp request_transcription(payload, file_path, opts) do
+    http_client =
+      opts
+      |> Keyword.get(:http_client, &Req.post/2)
+      |> normalize_http_client!()
+
+    base_url = Keyword.get(opts, :base_url) || config(:base_url) || "https://api.openai.com/v1"
+    url = build_audio_transcriptions_url(base_url)
+    model = transcription_model(opts)
+    response_format = Keyword.get(opts, :response_format, "text") |> to_string()
+
+    form_fields = Keyword.get(opts, :form_fields, [])
+
+    unless Keyword.keyword?(form_fields) do
+      raise ArgumentError, ":form_fields must be a keyword list"
+    end
+
+    filename = Keyword.get(opts, :filename) || default_filename(file_path)
+
+    content_type =
+      Keyword.get(opts, :content_type) ||
+        MIME.from_path(filename) ||
+        MIME.from_path(file_path) ||
+        "application/octet-stream"
+
+    form_data =
+      [
+        file: {payload, filename: filename, content_type: content_type},
+        model: model,
+        response_format: response_format
+      ] ++ form_fields
+
+    req_options =
+      opts
+      |> Keyword.get(:req_options, [])
+      |> normalize_keyword_list!(:req_options)
+      |> Keyword.put(:form_multipart, form_data)
+      |> merge_headers(opts[:headers])
+      |> ensure_authorization(opts[:api_key])
+      |> ensure_receive_timeout(opts)
+
+    case http_client.(url, req_options) do
+      {:ok, %{status: status, body: body}} when status in 200..299 -> {:ok, body}
+      {:ok, %{status: status, body: body}} -> {:error, %{status: status, body: body}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp transcription_model(opts) do
+    value =
+      Keyword.get(opts, :model) ||
+        config(:transcription_model) ||
+        config(:default_model) ||
+        "gpt-4o-mini-transcribe"
+
+    to_string(value)
+  end
+
+  defp build_audio_transcriptions_url(base_url) do
+    trimmed =
+      base_url
+      |> to_string()
+      |> String.trim_trailing("/")
+
+    trimmed <> "/audio/transcriptions"
+  end
+
+  defp default_filename(file_path) do
+    case Path.extname(file_path) do
+      "" -> Path.basename(file_path) <> ".webm"
+      _ -> Path.basename(file_path)
+    end
+  end
+
+  defp merge_headers(req_options, nil), do: req_options
+
+  defp merge_headers(req_options, headers) do
+    existing = Keyword.get(req_options, :headers, [])
+    Keyword.put(req_options, :headers, existing ++ List.wrap(headers))
+  end
+
+  defp ensure_authorization(req_options, api_key) do
+    headers = Keyword.get(req_options, :headers, [])
+
+    if Enum.any?(headers, fn {key, _} -> String.downcase(to_string(key)) == "authorization" end) do
+      req_options
+    else
+      Keyword.put(req_options, :headers, [{"authorization", "Bearer #{api_key}"} | headers])
+    end
+  end
+
+  defp ensure_receive_timeout(req_options, opts) do
+    if Keyword.has_key?(req_options, :receive_timeout) do
+      req_options
+    else
+      timeout =
+        Keyword.get(opts, :receive_timeout) ||
+          Keyword.get(opts, :timeout) ||
+          config(:request_timeout) || 30_000
+
+      Keyword.put(req_options, :receive_timeout, timeout)
+    end
+  end
+
+  defp format_transcription_body(body, opts) do
+    if Keyword.get(opts, :raw, false) do
+      {:ok, body}
+    else
+      {:ok, normalize_transcription_text(body)}
+    end
+  end
+
+  defp normalize_transcription_text(body) when is_binary(body), do: body
+
+  defp normalize_transcription_text(%{"text" => text}) when is_binary(text), do: text
+  defp normalize_transcription_text(%{text: text}) when is_binary(text), do: text
+  defp normalize_transcription_text(body), do: inspect(body)
+
+  defp normalize_keyword_list!(value, key_name) do
+    if Keyword.keyword?(value) do
+      value
+    else
+      raise ArgumentError, "#{key_name} must be a keyword list, got: #{inspect(value)}"
+    end
+  end
+
+  defp normalize_http_client!(fun) when is_function(fun, 2), do: fun
+
+  defp normalize_http_client!(fun) do
+    raise ArgumentError,
+          ":http_client must be a function accepting (url, options). Got: #{inspect(fun)}"
+  end
 
   defp config(key) do
     Application.get_env(:aquila, :openai, []) |> Keyword.get(key)

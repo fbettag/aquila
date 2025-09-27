@@ -27,7 +27,8 @@ requests, and enabling streaming output.
     config :aquila, :openai,
       api_key: System.fetch_env!("OPENAI_API_KEY"),
       base_url: "https://api.openai.com/v1",
-      default_model: "gpt-4.1-mini"
+      default_model: "gpt-4.1-mini",
+      transcription_model: "gpt-4o-mini-transcribe"
     ```
 
 3. Configure cassette recording for tests:
@@ -106,6 +107,26 @@ response = Aquila.ask("Store this", store: true)
 
 Recorded cassettes fully capture the GET/DELETE traffic, so tests can replay
 the lifecycle without making additional API calls.
+
+## Audio Transcription
+
+When you need speech-to-text, call `Aquila.transcribe_audio/2`. The helper uses
+the configured OpenAI credentials, sends multipart uploads, and returns cleaned
+text (or the raw payload when `raw: true`).
+
+```elixir
+{:ok, transcript} =
+  Aquila.transcribe_audio("/tmp/meeting.webm",
+    form_fields: [temperature: 0],
+    response_format: "text"
+  )
+
+IO.puts(transcript)
+```
+
+Override the filename or MIME type with `:filename`/`:content_type` when your
+storage backend strips extensions, and pass `:form_fields` to forward optional
+parameters such as `language`.
 
 ## Tool Support
 

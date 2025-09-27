@@ -23,6 +23,8 @@ mythological lineup.
   response storage and use `Aquila.retrieve_response/2` / `Aquila.delete_response/2`
   to manage conversations later. The flag is ignored automatically for Chat
   Completions.
+- **Audio transcription** – `Aquila.transcribe_audio/2` wraps the OpenAI audio
+  transcription endpoint with multipart uploads and sensible defaults.
 - **Multi-provider ready** – pair Aquila with
   [LiteLLM](https://docs.litellm.ai/docs/) when you need Anthropic, Azure
   OpenAI, or other providers behind an OpenAI-compatible endpoint.
@@ -48,6 +50,7 @@ config :aquila, :openai,
   api_key: System.fetch_env!("OPENAI_API_KEY"),
   base_url: "https://api.openai.com/v1",
   default_model: "gpt-4.1-mini",
+  transcription_model: "gpt-4o-mini-transcribe",
   request_timeout: 30_000
 
 config :aquila, :recorder,
@@ -76,6 +79,25 @@ receive do
   {:aquila_done, _text, meta, ^ref} -> IO.inspect(meta, label: "usage")
 end
 ```
+
+### Transcribe Audio
+
+Use `Aquila.transcribe_audio/2` when you need OpenAI’s speech-to-text API.
+The helper reads the file, attaches metadata, and honours the configured
+credentials.
+
+```elixir
+{:ok, transcript} =
+  Aquila.transcribe_audio("/tmp/recording.webm",
+    form_fields: [temperature: 0],
+    response_format: "text"
+  )
+
+IO.puts(transcript)
+```
+
+Pass `raw: true` to receive the provider response without post-processing when
+requesting formats like `json` or `verbose_json`.
 
 ### Persist Responses
 

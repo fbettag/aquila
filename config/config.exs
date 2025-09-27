@@ -9,6 +9,7 @@ config :aquila,
 config :aquila, :openai,
   base_url: "https://api.openai.com/v1",
   default_model: "gpt-4o-mini",
+  transcription_model: "gpt-4o-mini-transcribe",
   api_key: {:system, "OPENAI_API_KEY"},
   request_timeout: 30_000
 

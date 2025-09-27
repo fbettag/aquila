@@ -39,7 +39,7 @@ cleanly inside background processors such as Oban without any custom wrappers.
 ## Key Modules
 
 - `Aquila` – developer-facing API for `ask/2`, `stream/2`,
-  `retrieve_response/2`, and `delete_response/2`.
+  `retrieve_response/2`, `delete_response/2`, and `transcribe_audio/2`.
 - `Aquila.Engine` – internal orchestrator that normalises events, manages tool
   invocations, and reports telemetry.
 - `Aquila.Transport.*` – adapters for real HTTP (`OpenAI`), auto-recording
@@ -59,6 +59,7 @@ cleanly inside background processors such as Oban without any custom wrappers.
 | Process/UI integration | `Aquila.Sink`, `Aquila.Engine` | Forward sink events to controllers, GenServers, or custom processes |
 | Response storage | `Aquila`, `Aquila.Engine` | `store: true` persists Responses output |
 | Retrieve/delete stored responses | `Aquila`, `Aquila.Transport.Record` | Helpers fetch and purge stored conversations, recorder tracks GET/DELETE |
+| Audio transcription | `Aquila` | `transcribe_audio/2` posts multipart payloads to `/audio/transcriptions` |
 
 ## Multi-Provider Access via LiteLLM
 
