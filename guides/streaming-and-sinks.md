@@ -91,3 +91,33 @@ latency metrics alongside your sink-driven UI updates.
 Tool invocations surface as `{:aquila_event, %{type: :tool_call, ...}, ref}`
 followed by `:tool_call_end` events. This makes it straightforward to render
 “assistant is thinking” indicators or log tool payloads for debugging.
+
+Define tools with atom-keyed schemas and an optional context argument to keep
+callbacks ergonomic:
+
+```elixir
+logger =
+  Aquila.Tool.new(
+    "log",
+    parameters: %{
+      type: :object,
+      properties: %{
+        level: %{type: :string, required: true},
+        message: %{type: :string, required: true}
+      }
+    },
+    fn %{"level" => level, "message" => message}, ctx ->
+      ctx.logger.log(level, message)
+      %{status: "ok"}
+    end
+  )
+
+{:ok, ref} =
+  Aquila.stream(messages,
+    tools: [logger],
+    tool_context: %{logger: MyApp.Logger}
+  )
+```
+
+Single-arity callbacks continue to work; only supply `tool_context:` when you
+need to inject application state or dependencies into the tool execution.
