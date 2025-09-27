@@ -47,10 +47,10 @@ use Aquila.Cassette
 end
 ```
 
-`aquila_cassette/3` stores the cassette name in the process dictionary so any
-nested Aquila calls (even deep inside LiveView helpers) inherit it
-automatically. Pass additional options—such as `cassette_index:`—to the macro
-when you need to target a specific fixture.
+`aquila_cassette/3` shares the cassette assignment with any process that
+inherits the test’s group leader (including LiveView processes and async Tasks),
+so nested Aquila calls pick it up automatically. Pass additional options—such
+as `cassette_index:`—to the macro when you need to target a specific fixture.
 
 If you introduce Mox-powered doubles for transports or sinks, add
 `setup :verify_on_exit!` / `setup :set_mox_global` inside that specific test

@@ -74,6 +74,13 @@ defmodule AquilaCassetteMacroTest do
     refute Cassette.current()
   end
 
+  test "cassette visible to processes sharing group leader" do
+    aquila_cassette "shared" do
+      task = Task.async(fn -> Cassette.current() end)
+      assert Task.await(task) == {"shared", []}
+    end
+  end
+
   test "explicit cassette option bypasses macro" do
     aquila_cassette "macro-demo" do
       Aquila.ask("hi", cassette: "manual")

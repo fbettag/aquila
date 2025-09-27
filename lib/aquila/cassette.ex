@@ -9,6 +9,7 @@ defmodule Aquila.Cassette do
   """
 
   @cassette_key :"aquila:cassette"
+  @group_key :"aquila:cassette:group"
 
   defmacro __using__(_opts) do
     quote do
@@ -37,14 +38,16 @@ defmodule Aquila.Cassette do
   @spec with(String.t() | atom(), keyword(), (-> result)) :: result when result: var
   def with(name, opts \\ [], fun) when is_function(fun, 0) do
     entry = normalize_entry(name, opts)
-    previous = Process.get(@cassette_key)
+    group_id = group_key()
+    previous = {Process.get(@cassette_key), :persistent_term.get(group_id, :none)}
 
     Process.put(@cassette_key, entry)
+    :persistent_term.put(group_id, entry)
 
     try do
       fun.()
     after
-      restore(previous)
+      restore(previous, group_id)
     end
   end
 
@@ -54,18 +57,32 @@ defmodule Aquila.Cassette do
   """
   @spec current() :: {String.t(), keyword()} | nil
   def current do
-    Process.get(@cassette_key)
+    Process.get(@cassette_key) ||
+      case :persistent_term.get(group_key(), :none) do
+        :none -> nil
+        value -> value
+      end
   end
 
   @doc false
   @spec clear() :: :ok
   def clear do
     Process.delete(@cassette_key)
+    :persistent_term.erase(group_key())
     :ok
   end
 
-  defp restore(nil), do: Process.delete(@cassette_key)
-  defp restore(entry), do: Process.put(@cassette_key, entry)
+  defp restore({prev_proc, prev_group}, group_id) do
+    case prev_proc do
+      nil -> Process.delete(@cassette_key)
+      value -> Process.put(@cassette_key, value)
+    end
+
+    case prev_group do
+      :none -> :persistent_term.erase(group_id)
+      value -> :persistent_term.put(group_id, value)
+    end
+  end
 
   defp normalize_entry(name, opts) do
     unless Keyword.keyword?(opts) do
@@ -74,4 +91,6 @@ defmodule Aquila.Cassette do
 
     {to_string(name), Keyword.delete(opts, :cassette)}
   end
+
+  defp group_key, do: {@group_key, Process.group_leader()}
 end
