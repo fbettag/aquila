@@ -37,7 +37,7 @@ requests, and enabling streaming output.
    # config/test.exs
    config :aquila, :transport, Aquila.Transport.Record
    config :aquila, :recorder,
-     path: "test/support/cassettes",
+    path: "test/support/fixtures/aquila_cassettes",
      transport: Aquila.Transport.OpenAI
    ```
 

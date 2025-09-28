@@ -1,0 +1,36 @@
+{
+  "body": {
+    "input": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "input_text",
+            "text": "Say hello and include today's year."
+          }
+        ]
+      }
+    ],
+    "stream": true,
+    "instructions": "Keep it short",
+    "metadata": {},
+    "store": true,
+    "tools": [],
+    "model": "gpt-4o-mini"
+  },
+  "url": "https://api.openai.com/v1/responses",
+  "headers": [
+    [
+      "content-type",
+      "application/json"
+    ],
+    [
+      "authorization",
+      "[redacted]"
+    ]
+  ],
+  "endpoint": "responses",
+  "model": "gpt-4o-mini",
+  "method": "post",
+  "body_hash": "be086d4e14c952e4ab8428c19524c83b30a2bf2b161b27eaf89b7e0f19718656"
+}

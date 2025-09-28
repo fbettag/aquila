@@ -4,20 +4,30 @@ cond do
   is_binary(key) and String.trim(key) != "" ->
     defmodule Aquila.OpenAITransportLiveTest do
       use ExUnit.Case, async: false
+      use Aquila.Cassette
 
       @moduletag :live
 
       setup do
-        {:ok, api_key: System.get_env("OPENAI_API_KEY")}
+        api_key =
+          Application.get_env(:aquila, :openai, [])
+          |> Keyword.get(:api_key)
+          |> case do
+            {:system, var} -> System.get_env(var)
+            value -> value
+          end
+
+        {:ok, api_key: api_key}
       end
 
-      test "direct transport completes", %{api_key: api_key} do
+      test "direct transport completes", %{api_key: _api_key} do
         response =
-          Aquila.ask("Reply with the word coverage.",
-            transport: Aquila.Transport.OpenAI,
-            api_key: api_key,
-            timeout: 60_000
-          )
+          aquila_cassette "integration/direct-coverage" do
+            Aquila.ask("Reply with the word coverage.",
+              transport: Aquila.Transport.OpenAI,
+              timeout: 60_000
+            )
+          end
 
         assert String.contains?(String.downcase(response.text), "coverage")
       end

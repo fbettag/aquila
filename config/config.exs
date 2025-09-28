@@ -2,7 +2,7 @@ import Config
 
 config :aquila,
   recorder: [
-    path: "test/support/cassettes",
+    path: "test/support/fixtures/aquila_cassettes",
     transport: Aquila.Transport.OpenAI
   ]
 

@@ -1,0 +1,12 @@
+{"id":"resp_68d8e82e448c819696353f684f25849f0adb593ca46f5767","type":"response_ref"}
+{"content":"Hello","type":"delta"}
+{"content":"!","type":"delta"}
+{"content":" How","type":"delta"}
+{"content":" can","type":"delta"}
+{"content":" I","type":"delta"}
+{"content":" assist","type":"delta"}
+{"content":" you","type":"delta"}
+{"content":" today","type":"delta"}
+{"content":"?","type":"delta"}
+{"content":"Hello! How can I assist you today?","type":"delta"}
+{"meta":{"id":"resp_68d8e82e448c819696353f684f25849f0adb593ca46f5767","status":"completed","metadata":{},"usage":{"input_tokens":9,"input_tokens_details":{"cached_tokens":0},"output_tokens":10,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":19},"_fallback_text":"Hello! How can I assist you today?"},"status":"completed","type":"done"}

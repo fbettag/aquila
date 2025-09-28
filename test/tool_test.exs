@@ -25,6 +25,23 @@ defmodule Aquila.ToolTest do
     assert tool.parameters == @params
   end
 
+  test "new/1 with keyword options uses :fn callback" do
+    tool =
+      Tool.new("echo",
+        parameters: @params,
+        description: "echoes",
+        fn: fn args, ctx -> {args, ctx} end
+      )
+
+    assert tool.name == "echo"
+    assert :erlang.fun_info(tool.fun)[:arity] == 2
+    assert tool.description == "echoes"
+  end
+
+  test "new/1 with keyword raises without callback" do
+    assert_raise ArgumentError, fn -> Tool.new("echo", parameters: @params) end
+  end
+
   test "new/3 accepts arity-2 callbacks" do
     tool = Tool.new("echo", [parameters: @params], fn args, ctx -> {args, ctx} end)
 
@@ -62,6 +79,14 @@ defmodule Aquila.ToolTest do
     assert %{function: %{name: :calc}} = Tool.to_openai(map)
   end
 
+  test "to_openai stringifies atom type" do
+    map = %{type: :function, function: %{name: "calc"}}
+    result = Tool.to_openai(map)
+
+    assert result[:type] == "function"
+    assert result[:function][:name] == "calc"
+  end
+
   test "normalizes atom-key parameters and builds required list" do
     tool = Tool.new("echo", [parameters: @atom_params], fn _ -> :ok end)
 
@@ -71,6 +96,13 @@ defmodule Aquila.ToolTest do
     assert foo_schema["description"] == "Foo"
     assert bar_schema["type"] == "integer"
     assert tool.parameters["required"] == ["foo"]
+  end
+
+  test "normalizes string keyed schemas without changes" do
+    params = %{"type" => "object", "properties" => %{"foo" => %{"type" => "string"}}}
+    tool = Tool.new("echo", [parameters: params], fn _ -> :ok end)
+
+    assert tool.parameters == params
   end
 
   test "normalizes nested array schemas" do

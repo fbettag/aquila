@@ -10,7 +10,11 @@ defmodule Aquila.Engine do
   explain how prompts flow through transports, sinks, and tool invocations.
   """
 
-  alias Aquila.{Endpoint, Message, Response, Sink, Tool}
+  alias Aquila.Endpoint
+  alias Aquila.Message
+  alias Aquila.Response
+  alias Aquila.Sink
+  alias Aquila.Tool
 
   defmodule State do
     @moduledoc false
@@ -330,8 +334,103 @@ defmodule Aquila.Engine do
     {payload, new_messages}
   end
 
-  defp invoke_tool_fun(fun, args, context) when is_function(fun, 2), do: fun.(args, context)
-  defp invoke_tool_fun(fun, args, _context) when is_function(fun, 1), do: fun.(args)
+  defp invoke_tool_fun(fun, args, context) when is_function(fun, 2) do
+    safe_tool_invoke(fn -> fun.(args, context) end)
+  end
+
+  defp invoke_tool_fun(fun, args, _context) when is_function(fun, 1) do
+    safe_tool_invoke(fn -> fun.(args) end)
+  end
+
+  defp safe_tool_invoke(fun) do
+    normalize_tool_result(fun.())
+  rescue
+    exception ->
+      normalize_tool_result({:exception, exception, __STACKTRACE__})
+  end
+
+  defp normalize_tool_result({:ok, value}), do: normalize_tool_result(value)
+
+  defp normalize_tool_result({:error, reason}) do
+    error_payload("Operation failed", reason)
+  end
+
+  defp normalize_tool_result({value, _bindings}), do: normalize_tool_result(value)
+
+  defp normalize_tool_result({:exception, exception, stacktrace}) do
+    formatted = Exception.format(:error, exception, stacktrace)
+    error_payload("Exception raised", formatted)
+  end
+
+  defp normalize_tool_result(value) when is_struct(value) do
+    if ecto_changeset?(value) do
+      error_payload("Validation failed", format_changeset_errors(value))
+    else
+      inspect(value)
+    end
+  end
+
+  defp normalize_tool_result(value) when is_binary(value), do: value
+  defp normalize_tool_result(value) when is_map(value), do: value
+  defp normalize_tool_result(value), do: value
+
+  defp error_payload(header, reason) do
+    [header, render_reason(reason)]
+    |> Enum.reject(&(&1 in [nil, ""]))
+    |> Enum.join("\n")
+  end
+
+  defp render_reason(reason) do
+    cond do
+      ecto_changeset?(reason) -> format_changeset_errors(reason)
+      is_binary(reason) -> reason
+      is_struct(reason) -> inspect(reason)
+      is_map(reason) -> inspect(reason)
+      is_list(reason) -> inspect(reason)
+      true -> inspect(reason)
+    end
+  end
+
+  defp ecto_changeset?(%{__struct__: struct}) do
+    ecto_changeset_module = Module.concat(Ecto, Changeset)
+    struct == ecto_changeset_module and Code.ensure_loaded?(ecto_changeset_module)
+  rescue
+    ArgumentError -> false
+  end
+
+  defp ecto_changeset?(_), do: false
+
+  defp format_changeset_errors(changeset) do
+    module = Module.concat(Ecto, Changeset)
+
+    if Code.ensure_loaded?(module) and function_exported?(module, :traverse_errors, 2) do
+      errors =
+        module.traverse_errors(changeset, fn {msg, opts} ->
+          Enum.reduce(opts, msg, fn {key, value}, acc ->
+            String.replace(acc, "%{#{key}}", to_string(value))
+          end)
+        end)
+
+      if Enum.empty?(errors) do
+        inspect(changeset)
+      else
+        Enum.map_join(errors, "\n", fn {field, messages} ->
+          field_name =
+            field
+            |> to_string()
+            |> String.replace("_", " ")
+            |> String.trim()
+            |> String.capitalize()
+
+          formatted_messages = messages |> List.wrap() |> Enum.map_join(", ", &to_string/1)
+
+          "#{field_name}: #{formatted_messages}"
+        end)
+      end
+    else
+      inspect(changeset)
+    end
+  end
 
   defp parse_args(nil), do: %{}
 
@@ -525,7 +624,7 @@ defmodule Aquila.Engine do
   defp resolve_api_key(_), do: nil
 
   defp config(key) do
-    Application.get_env(:aquila, :openai, []) |> Keyword.get(key)
+    :aquila |> Application.get_env(:openai, []) |> Keyword.get(key)
   end
 
   defp final_text(%State{} = state) do

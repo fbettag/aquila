@@ -7,7 +7,7 @@ defmodule Aquila.Transport.Cassette do
   @spec base_path() :: String.t()
   def base_path do
     Application.get_env(:aquila, :recorder, [])
-    |> Keyword.get(:path, "test/support/cassettes")
+    |> Keyword.get(:path, "test/support/fixtures/aquila_cassettes")
   end
 
   @spec meta_path(cassette(), index()) :: String.t()

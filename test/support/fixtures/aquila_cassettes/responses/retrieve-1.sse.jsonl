@@ -1,0 +1,12 @@
+{"id":"resp_68d8e82f534881a18de2846466c3953a064410acddb9e47b","type":"response_ref"}
+{"content":"Hello","type":"delta"}
+{"content":"!","type":"delta"}
+{"content":" The","type":"delta"}
+{"content":" year","type":"delta"}
+{"content":" is","type":"delta"}
+{"content":" ","type":"delta"}
+{"content":"202","type":"delta"}
+{"content":"3","type":"delta"}
+{"content":".","type":"delta"}
+{"content":"Hello! The year is 2023.","type":"delta"}
+{"meta":{"id":"resp_68d8e82f534881a18de2846466c3953a064410acddb9e47b","status":"completed","metadata":{},"usage":{"input_tokens":21,"input_tokens_details":{"cached_tokens":0},"output_tokens":10,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":31},"_fallback_text":"Hello! The year is 2023."},"status":"completed","type":"done"}

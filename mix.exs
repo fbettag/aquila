@@ -37,6 +37,8 @@ defmodule Aquila.MixProject do
       {:req, "~> 0.5"},
       {:jason, "~> 1.4"},
       {:telemetry, "~> 1.2"},
+
+      # testing
       {:plug, "~> 1.15", only: :test},
       {:plug_cowboy, "~> 2.7", only: :test},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},

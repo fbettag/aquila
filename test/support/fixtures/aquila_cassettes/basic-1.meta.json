@@ -1,0 +1,34 @@
+{
+  "body": {
+    "input": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "input_text",
+            "text": "Hi there"
+          }
+        ]
+      }
+    ],
+    "stream": true,
+    "metadata": {},
+    "tools": [],
+    "model": "gpt-4o-mini"
+  },
+  "url": "https://api.openai.com/v1/responses",
+  "headers": [
+    [
+      "content-type",
+      "application/json"
+    ],
+    [
+      "authorization",
+      "[redacted]"
+    ]
+  ],
+  "endpoint": "responses",
+  "model": "gpt-4o-mini",
+  "method": "post",
+  "body_hash": "dc9b9ac20a2116b98c8575dfe0377220e6c619c908fbafb6688ced3b79511371"
+}

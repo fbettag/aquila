@@ -113,7 +113,7 @@ defmodule Aquila.Transport.Record do
     persist_meta(cassette, index, clean_req, body_hash)
 
     Cassette.ensure_dir(Cassette.sse_path(cassette, index))
-    {:ok, io} = File.open(Cassette.sse_path(cassette, index), [:write])
+    {:ok, io} = File.open(Cassette.sse_path(cassette, index), [:write, :utf8])
 
     writer = fn event ->
       IO.write(io, Jason.encode!(serialize_event(event)) <> "\n")
@@ -164,16 +164,29 @@ defmodule Aquila.Transport.Record do
     end
   end
 
-  defp raise_prompt_mismatch(path, meta, _body, hash) do
+  defp raise_prompt_mismatch(path, meta, body, hash) do
     base = Path.rootname(path, ".meta.json")
     files = Enum.join([path, base <> ".sse.jsonl", base <> ".json"], " ")
+
+    new_meta = %{
+      endpoint: meta["endpoint"],
+      url: meta["url"],
+      model: meta["model"],
+      method: meta["method"],
+      body: body,
+      body_hash: hash,
+      headers: meta["headers"]
+    }
+
+    File.write!(base <> ".new.meta.json", Jason.encode!(new_meta, pretty: true))
 
     message =
       [
         "Cassette prompt mismatch for #{path}.",
         "Old hash: #{meta["body_hash"]}",
         "New hash: #{hash}",
-        "Remove the cassette (e.g. rm #{files}) and re-record."
+        "Updated request body written to #{base <> ".new.meta.json"}.",
+        "Remove the cassette (e.g. rm #{files}) and re-record or update it to match."
       ]
       |> Enum.join("\n")
 

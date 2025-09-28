@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 - `lib/` contains the Aquila runtime modules, including the public API (`aquila.ex`), transports, and engine logic.
-- `test/` holds ExUnit suites plus cassette fixtures under `test/support/cassettes/` for deterministic replay.
+- `test/` holds ExUnit suites plus cassette fixtures under `test/support/fixtures/aquila_cassettes/` for deterministic replay.
 - `guides/` and `README.md` provide contributor-facing documentation; update them when the public API changes.
 - `config/` manages Mix environments; `config/test.exs` pins the recorder transport and cassette directory.
 

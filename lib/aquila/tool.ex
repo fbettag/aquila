@@ -28,6 +28,23 @@ defmodule Aquila.Tool do
   * `:parameters` (required) – JSON Schema map describing the tool arguments.
   * `:description` – short description surfaced in the model prompt.
   """
+  @spec new(String.t(), keyword()) :: t()
+  def new(name, opts) when is_list(opts) do
+    {fun, remaining_opts} =
+      cond do
+        Keyword.has_key?(opts, :fn) ->
+          Keyword.pop(opts, :fn)
+
+        Keyword.has_key?(opts, :fun) ->
+          Keyword.pop(opts, :fun)
+
+        true ->
+          raise ArgumentError, "tool requires :fn callback"
+      end
+
+    new(name, remaining_opts, fun)
+  end
+
   @spec new(String.t(), (map() -> any())) :: t()
   def new(name, fun) when is_function(fun, 1), do: new(name, [], fun)
   def new(name, fun) when is_function(fun, 2), do: new(name, [], fun)
@@ -58,8 +75,7 @@ defmodule Aquila.Tool do
   @spec to_openai(map() | t()) :: map()
   def to_openai(%__MODULE__{name: name, description: description, parameters: parameters}) do
     function =
-      %{name: name, parameters: parameters}
-      |> maybe_put(:description, description)
+      maybe_put(%{name: name, parameters: parameters}, :description, description)
 
     %{type: "function", function: function}
   end

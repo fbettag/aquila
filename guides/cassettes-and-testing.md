@@ -10,7 +10,7 @@ request hashing, forcing you to re-record when inputs drift.
 # config/test.exs
 config :aquila, :transport, Aquila.Transport.Record
 config :aquila, :recorder,
-  path: "test/support/cassettes",
+  path: "test/support/fixtures/aquila_cassettes",
   transport: Aquila.Transport.OpenAI
 ```
 
@@ -55,6 +55,32 @@ as `cassette_index:`—to the macro when you need to target a specific fixture.
 If you introduce Mox-powered doubles for transports or sinks, add
 `setup :verify_on_exit!` / `setup :set_mox_global` inside that specific test
 module. Plain cassette-backed tests do not need them.
+
+### LiveView suites
+
+LiveView tests benefit from Phoenix’s async helpers. After triggering the
+event that kicks off `start_async/3` or `stream_async/3`, call
+`Phoenix.LiveViewTest.render_async/1` once; it waits until all running async
+jobs complete and renders the updated view:
+
+```elixir
+test "renders streamed response", %{conn: conn} do
+  aquila_cassette "chat_live.responds" do
+    {:ok, view, _html} = live(conn, ~p"/chat")
+
+    view
+    |> form("#chat-form", message: %{content: "Hi"})
+    |> render_submit()
+
+    assert render_async(view) =~ "Hello there!"
+  end
+end
+```
+
+`render_async/1` replaces ad-hoc polling loops (`render(view)`, sleeps, etc.)
+and mirrors how LiveView handles `start_async`/`handle_async` internally. When
+your view pushes events (downloads, flashes, etc.), pair the async render with
+`assert_push_event/4` to verify side effects deterministically.
 
 Recording should happen inside the test environment so your dev runtime remains
 live-call free. For most suites the `config/test.exs` snippet above is enough—no

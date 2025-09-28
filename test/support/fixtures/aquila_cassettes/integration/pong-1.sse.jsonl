@@ -1,0 +1,4 @@
+{"id":"resp_68d8e83492148192af245c944a1c880703dad00184e8653c","type":"response_ref"}
+{"content":"pong","type":"delta"}
+{"content":"pong","type":"delta"}
+{"meta":{"id":"resp_68d8e83492148192af245c944a1c880703dad00184e8653c","status":"completed","metadata":{},"usage":{"input_tokens":14,"input_tokens_details":{"cached_tokens":0},"output_tokens":2,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":16},"_fallback_text":"pong"},"status":"completed","type":"done"}
