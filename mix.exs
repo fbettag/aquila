@@ -13,6 +13,7 @@ defmodule Aquila.MixProject do
       docs: docs(),
       test_coverage: [tool: ExCoveralls],
       preferred_cli_env: [
+        quality: :test,
         coveralls: :test,
         "coveralls.html": :test,
         "coveralls.json": :test,
@@ -35,7 +36,7 @@ defmodule Aquila.MixProject do
   defp deps do
     [
       {:req, "~> 0.5"},
-      {:jason, "~> 1.4"},
+      {:stable_jason, "~> 2.0"},
       {:telemetry, "~> 1.2"},
 
       # testing

@@ -38,6 +38,11 @@ defmodule Aquila.Cassette do
   @spec with(String.t() | atom(), keyword(), (-> result)) :: result when result: var
   def with(name, opts \\ [], fun) when is_function(fun, 0) do
     entry = normalize_entry(name, opts)
+    cassette_name = elem(entry, 0)
+
+    # Reset the cassette index for this cassette to ensure clean state
+    Aquila.Transport.Cassette.reset_index(cassette_name)
+
     group_id = group_key()
     previous = {Process.get(@cassette_key), :persistent_term.get(group_id, :none)}
 

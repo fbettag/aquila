@@ -25,6 +25,28 @@ defmodule Aquila.Transport.Replay do
   @impl true
   def delete(req), do: handle_http(:delete, req)
 
+  # Deduplicates consecutive done events with the same status
+  # This handles cassettes that have duplicate "completed" done events
+  defp deduplicate_done_events(stream) do
+    stream
+    |> Stream.transform(nil, fn line, last_done ->
+      case Jason.decode(line) do
+        {:ok, %{"type" => "done", "status" => status}} ->
+          if status == last_done do
+            # Skip duplicate
+            {[], last_done}
+          else
+            # Emit and track
+            {[line], status}
+          end
+
+        _ ->
+          # Not a done event, emit it
+          {[line], last_done}
+      end
+    end)
+  end
+
   @doc """
   Streams recorded SSE events to the provided callback.
 
@@ -34,24 +56,191 @@ defmodule Aquila.Transport.Replay do
   @impl true
   def stream(%{opts: opts} = req, callback) when is_function(callback, 1) do
     with {:ok, cassette} <- fetch_cassette(opts) do
-      index = Cassette.next_index(cassette, opts)
-      verify_prompt!(req, cassette, index, :post)
+      request_id = Cassette.next_index(cassette, opts)
+      verify_prompt!(req, cassette, request_id, :post)
 
-      cassette
-      |> Cassette.sse_path(index)
-      |> File.stream!()
-      |> Stream.map(&String.trim/1)
-      |> Stream.reject(&(&1 == ""))
-      |> Enum.each(fn line ->
-        case Jason.decode!(line) do
-          %{"type" => "meta"} -> :ok
-          event -> event |> to_event() |> callback.()
-        end
-      end)
+      # Buffer tool calls to synthesize tool_call_end events
+      # State: {tool_calls_map, current_tool_id, pending_done_event}
+      {tool_calls, _, pending_done} =
+        cassette
+        |> Cassette.sse_path()
+        |> File.stream!()
+        |> Stream.map(&String.trim/1)
+        |> Stream.reject(&(&1 == ""))
+        |> Stream.filter(&matches_request_id?(&1, request_id))
+        |> deduplicate_done_events()
+        |> Enum.reduce({%{}, nil, nil}, fn line, {tool_calls_acc, current_id, buffered_done} ->
+          case Jason.decode!(line) do
+            %{"type" => "meta"} ->
+              {tool_calls_acc, current_id, buffered_done}
+
+            %{"type" => "tool_call", "id" => id, "name" => name} = event
+            when not is_nil(id) and not is_nil(name) ->
+              # Start tracking this tool call
+              updated_calls = Map.put(tool_calls_acc, id, %{id: id, name: name, fragments: []})
+              event |> to_event() |> callback.()
+              {updated_calls, id, buffered_done}
+
+            %{"type" => "tool_call", "args_fragment" => fragment} = event
+            when not is_nil(fragment) ->
+              # Accumulate fragment for the current tool call
+              # Use call_id if present, otherwise use current_id
+              target_id = Map.get(event, "call_id") || current_id
+
+              updated_calls =
+                if target_id do
+                  Map.update(tool_calls_acc, target_id, %{fragments: [fragment]}, fn call ->
+                    %{call | fragments: call.fragments ++ [fragment]}
+                  end)
+                else
+                  tool_calls_acc
+                end
+
+              event |> to_event() |> callback.()
+              {updated_calls, current_id, buffered_done}
+
+            %{"type" => "done", "status" => "requires_action"} = event ->
+              # Don't emit the done event yet - we need to synthesize tool_call_end first
+              {tool_calls_acc, current_id, event}
+
+            %{"type" => "done"} = event ->
+              # Process done event (duplicates already filtered out by deduplicate_done_events)
+              if buffered_done do
+                # Synthesize tool_call_end events for all buffered tool calls
+                Enum.each(tool_calls_acc, fn {_id, call} ->
+                  args_json = Enum.join(call.fragments, "")
+
+                  args =
+                    case Jason.decode(args_json) do
+                      {:ok, decoded} ->
+                        decoded
+
+                      {:error, error} ->
+                        require Logger
+                        Logger.error("Failed to decode tool args JSON: #{inspect(error)}")
+                        Logger.error("Args JSON was: #{inspect(args_json)}")
+                        Logger.error("Fragments were: #{inspect(call.fragments)}")
+                        %{}
+                    end
+
+                  tool_call_end = %{
+                    type: :tool_call_end,
+                    id: call.id,
+                    name: call.name,
+                    args: args,
+                    call_id: call.id
+                  }
+
+                  require Logger
+
+                  Logger.debug(
+                    "Replay: Synthesizing tool_call_end for #{call.name} with args: #{inspect(args)}"
+                  )
+
+                  callback.(tool_call_end)
+                  Logger.debug("Replay: tool_call_end callback completed")
+                end)
+
+                # Now emit the buffered done event
+                buffered_done |> to_event() |> callback.()
+
+                # Clear state after processing
+                {%{}, nil, nil}
+              else
+                # No buffered done, just emit the event normally
+                event |> to_event() |> callback.()
+                {tool_calls_acc, current_id, nil}
+              end
+
+            event ->
+              # Check if we just buffered a requires_action done event
+              if buffered_done do
+                # Synthesize tool_call_end events for all buffered tool calls
+                Enum.each(tool_calls_acc, fn {_id, call} ->
+                  args_json = Enum.join(call.fragments, "")
+
+                  args =
+                    case Jason.decode(args_json) do
+                      {:ok, decoded} ->
+                        decoded
+
+                      {:error, error} ->
+                        require Logger
+                        Logger.error("Failed to decode tool args JSON: #{inspect(error)}")
+                        Logger.error("Args JSON was: #{inspect(args_json)}")
+                        Logger.error("Fragments were: #{inspect(call.fragments)}")
+                        %{}
+                    end
+
+                  tool_call_end = %{
+                    type: :tool_call_end,
+                    id: call.id,
+                    name: call.name,
+                    args: args,
+                    call_id: call.id
+                  }
+
+                  require Logger
+
+                  Logger.debug(
+                    "Replay: Synthesizing tool_call_end for #{call.name} with args: #{inspect(args)}"
+                  )
+
+                  callback.(tool_call_end)
+                  Logger.debug("Replay: tool_call_end callback completed")
+                end)
+
+                # Now emit the done event
+                buffered_done |> to_event() |> callback.()
+
+                # Emit the current event
+                event |> to_event() |> callback.()
+
+                # Clear state after processing
+                {%{}, nil, nil}
+              else
+                # No buffered done, just emit the event normally
+                event |> to_event() |> callback.()
+                {tool_calls_acc, current_id, nil}
+              end
+          end
+        end)
+
+      # If we ended with a buffered done event, emit it now
+      if tool_calls != %{} and pending_done do
+        Enum.each(tool_calls, fn {_id, call} ->
+          args_json = Enum.join(call.fragments, "")
+
+          args =
+            case Jason.decode(args_json) do
+              {:ok, decoded} -> decoded
+              {:error, _} -> %{}
+            end
+
+          tool_call_end = %{
+            type: :tool_call_end,
+            id: call.id,
+            name: call.name,
+            args: args,
+            call_id: call.id
+          }
+
+          callback.(tool_call_end)
+        end)
+
+        pending_done |> to_event() |> callback.()
+      end
 
       {:ok, make_ref()}
     else
       :no_cassette -> {:error, :missing_cassette}
+    end
+  end
+
+  defp matches_request_id?(line, request_id) do
+    case Jason.decode(line) do
+      {:ok, %{"request_id" => ^request_id}} -> true
+      _ -> false
     end
   end
 
@@ -78,18 +267,18 @@ defmodule Aquila.Transport.Replay do
 
         cond do
           !method_matches?(meta, method) ->
-            path = Cassette.meta_path(cassette, index)
+            path = Cassette.meta_path(cassette)
             raise_method_mismatch(path, method, meta)
 
           meta["body_hash"] == hash ->
             :ok
 
           true ->
-            path = Cassette.meta_path(cassette, index)
+            path = Cassette.meta_path(cassette)
 
             message =
               [
-                "Cassette prompt mismatch for #{path}.",
+                "Cassette prompt mismatch for request #{meta["request_id"]} in #{path}.",
                 "Recorded hash: #{meta["body_hash"]}",
                 "Current hash: #{hash}",
                 "Remove the cassette files and re-record."

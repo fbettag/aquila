@@ -1,6 +1,8 @@
 defmodule Aquila.Transport.Cassette do
   @moduledoc false
 
+  alias StableJason
+
   @type cassette :: String.t()
   @type index :: pos_integer()
 
@@ -10,11 +12,11 @@ defmodule Aquila.Transport.Cassette do
     |> Keyword.get(:path, "test/support/fixtures/aquila_cassettes")
   end
 
-  @spec meta_path(cassette(), index()) :: String.t()
-  def meta_path(name, index), do: Path.join(base_path(), "#{name}-#{index}.meta.json")
+  @spec meta_path(cassette()) :: String.t()
+  def meta_path(name), do: Path.join(base_path(), "#{name}.meta.jsonl")
 
-  @spec sse_path(cassette(), index()) :: String.t()
-  def sse_path(name, index), do: Path.join(base_path(), "#{name}-#{index}.sse.jsonl")
+  @spec sse_path(cassette()) :: String.t()
+  def sse_path(name), do: Path.join(base_path(), "#{name}.sse.jsonl")
 
   @spec post_path(cassette(), index()) :: String.t()
   def post_path(name, index), do: Path.join(base_path(), "#{name}-#{index}.json")
@@ -23,42 +25,119 @@ defmodule Aquila.Transport.Cassette do
   def exists?(cassette, index, what) do
     path =
       case what do
-        :meta -> meta_path(cassette, index)
-        :sse -> sse_path(cassette, index)
+        :meta -> meta_path(cassette)
+        :sse -> sse_path(cassette)
         :post -> post_path(cassette, index)
       end
 
-    File.exists?(path)
+    if what in [:meta, :sse] do
+      File.exists?(path) and has_request_id?(path, index)
+    else
+      File.exists?(path)
+    end
+  end
+
+  defp has_request_id?(path, request_id) do
+    case File.read(path) do
+      {:ok, content} ->
+        content
+        |> String.split("\n", trim: true)
+        |> Enum.any?(fn line ->
+          case Jason.decode(line) do
+            {:ok, %{"request_id" => ^request_id}} -> true
+            _ -> false
+          end
+        end)
+
+      {:error, _} ->
+        false
+    end
   end
 
   @spec next_index(cassette(), keyword()) :: index()
   def next_index(cassette, opts \\ []) do
     case Keyword.get(opts, :cassette_index) do
       nil ->
-        key = {:aquila_cassette_index, cassette}
-        idx = Process.get(key, 0) + 1
-        Process.put(key, idx)
-        idx
+        # Ensure ETS table exists
+        table = ensure_ets_table()
+
+        # Use update_counter for atomic increment
+        # update_counter returns the NEW value after increment
+        # Default value is 0, so first increment returns 1
+        :ets.update_counter(table, cassette, {2, 1}, {cassette, 0})
 
       index when is_integer(index) and index > 0 ->
         index
     end
   end
 
+  defp ensure_ets_table do
+    table_name = :aquila_cassette_indices
+
+    case :ets.whereis(table_name) do
+      :undefined ->
+        :ets.new(table_name, [:set, :public, :named_table])
+
+      _ref ->
+        table_name
+    end
+  end
+
+  @doc """
+  Resets the cassette index counter for a specific cassette or all cassettes.
+
+  Used in test setup to ensure clean state between test runs.
+  """
+  @spec reset_index(cassette() | :all) :: :ok
+  def reset_index(:all) do
+    case :ets.whereis(:aquila_cassette_indices) do
+      :undefined -> :ok
+      _ref -> :ets.delete_all_objects(:aquila_cassette_indices)
+    end
+
+    :ok
+  end
+
+  def reset_index(cassette) do
+    case :ets.whereis(:aquila_cassette_indices) do
+      :undefined -> :ok
+      _ref -> :ets.delete(:aquila_cassette_indices, cassette)
+    end
+
+    :ok
+  end
+
   @spec write_meta(cassette(), index(), map()) :: :ok
-  def write_meta(cassette, index, meta) do
-    path = meta_path(cassette, index)
+  def write_meta(cassette, request_id, meta) do
+    path = meta_path(cassette)
     ensure_dir(path)
-    File.write!(path, Jason.encode_to_iodata!(meta, pretty: true))
+
+    meta_with_id = Map.put(meta, "request_id", request_id)
+    line = StableJason.encode!(meta_with_id, sorter: :asc) <> "\n"
+
+    File.write!(path, line, [:append])
   end
 
   @spec read_meta(cassette(), index()) :: {:ok, map()} | {:error, term()}
-  def read_meta(cassette, index) do
-    path = meta_path(cassette, index)
+  def read_meta(cassette, request_id) do
+    path = meta_path(cassette)
 
     case File.read(path) do
-      {:ok, body} -> Jason.decode(body)
-      {:error, reason} -> {:error, {:meta_missing, path, reason}}
+      {:ok, content} ->
+        result =
+          content
+          |> String.split("\n", trim: true)
+          |> Enum.find_value(fn line ->
+            case Jason.decode(line) do
+              {:ok, %{"request_id" => ^request_id} = meta} -> {:ok, meta}
+              _ -> nil
+            end
+          end)
+
+        result || {:error, {:meta_missing, path, :not_found}}
+
+      {:error, reason} ->
+        {:error, {:meta_missing, path, reason}}
     end
   end
 

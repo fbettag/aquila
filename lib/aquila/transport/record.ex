@@ -21,6 +21,7 @@ defmodule Aquila.Transport.Record do
   @behaviour Aquila.Transport
 
   alias Aquila.Transport.{Cassette, Replay}
+  alias StableJason
 
   @doc """
   Replays or records non-streaming requests depending on cassette availability.
@@ -79,7 +80,9 @@ defmodule Aquila.Transport.Record do
   defp record_http(method, req, cassette, index) do
     clean_req = strip_recorder_opts(req)
     body = Map.get(clean_req, :body)
-    body_hash = request_hash(body)
+    # Normalize before hashing to ensure consistency
+    normalized_body = normalize_body(body)
+    body_hash = request_hash(normalized_body)
 
     case call_inner(method, clean_req) do
       {:ok, body} = ok ->
@@ -88,7 +91,7 @@ defmodule Aquila.Transport.Record do
 
         File.write!(
           Cassette.post_path(cassette, index),
-          Jason.encode_to_iodata!(body, pretty: true)
+          StableJason.encode!(body, sorter: :asc, pretty: true)
         )
 
         ok
@@ -107,16 +110,19 @@ defmodule Aquila.Transport.Record do
     |> Jason.decode()
   end
 
-  defp record_stream(req, cassette, index, callback) do
+  defp record_stream(req, cassette, request_id, callback) do
     clean_req = strip_recorder_opts(req)
-    body_hash = request_hash(clean_req.body)
-    persist_meta(cassette, index, clean_req, body_hash)
+    # Normalize before hashing to ensure consistency
+    normalized_body = normalize_body(clean_req.body)
+    body_hash = request_hash(normalized_body)
+    persist_meta(cassette, request_id, clean_req, body_hash)
 
-    Cassette.ensure_dir(Cassette.sse_path(cassette, index))
-    {:ok, io} = File.open(Cassette.sse_path(cassette, index), [:write, :utf8])
+    Cassette.ensure_dir(Cassette.sse_path(cassette))
+    {:ok, io} = File.open(Cassette.sse_path(cassette), [:append, :utf8])
 
     writer = fn event ->
-      IO.write(io, Jason.encode!(serialize_event(event)) <> "\n")
+      serialized = serialize_event(event, request_id)
+      IO.write(io, StableJason.encode!(serialized, sorter: :asc) <> "\n")
       callback.(event)
     end
 
@@ -138,22 +144,24 @@ defmodule Aquila.Transport.Record do
   defp verify_prompt!(req, cassette, index, method) do
     clean_req = strip_recorder_opts(req)
     body = Map.get(clean_req, :body)
+    # Normalize body before hashing to match what was done during recording
+    normalized_body = normalize_body(body)
 
     case Cassette.read_meta(cassette, index) do
       {:ok, meta} ->
-        hash = request_hash(body)
+        hash = request_hash(normalized_body)
 
         cond do
           !method_matches?(meta, method) ->
-            path = Cassette.meta_path(cassette, index)
+            path = Cassette.meta_path(cassette)
             raise_method_mismatch(path, meta, method)
 
           meta["body_hash"] == hash ->
             :ok
 
           true ->
-            path = Cassette.meta_path(cassette, index)
-            raise_prompt_mismatch(path, meta, clean_req.body, hash)
+            path = Cassette.meta_path(cassette)
+            raise_prompt_mismatch(path, meta, normalized_body, hash)
         end
 
       {:error, {:meta_missing, path, _}} ->
@@ -165,32 +173,72 @@ defmodule Aquila.Transport.Record do
   end
 
   defp raise_prompt_mismatch(path, meta, body, hash) do
-    base = Path.rootname(path, ".meta.json")
-    files = Enum.join([path, base <> ".sse.jsonl", base <> ".json"], " ")
+    base = Path.rootname(path, ".meta.jsonl")
+    files = Enum.join([path, base <> ".sse.jsonl"], " ")
 
     new_meta = %{
       endpoint: meta["endpoint"],
       url: meta["url"],
       model: meta["model"],
       method: meta["method"],
+      # Already normalized from verify_prompt!
       body: body,
       body_hash: hash,
-      headers: meta["headers"]
+      headers: meta["headers"],
+      request_id: meta["request_id"]
     }
 
-    File.write!(base <> ".new.meta.json", Jason.encode!(new_meta, pretty: true))
+    File.write!(base <> ".new.meta.jsonl", StableJason.encode!(new_meta, sorter: :asc) <> "\n", [
+      :append
+    ])
+
+    # Generate git-style diff of the prompt bodies
+    # body is already normalized from verify_prompt!
+    old_body = meta["body"]
+    diff = generate_body_diff(old_body, body)
 
     message =
       [
-        "Cassette prompt mismatch for #{path}.",
+        "Cassette prompt mismatch for request #{meta["request_id"]} in #{path}.",
         "Old hash: #{meta["body_hash"]}",
         "New hash: #{hash}",
-        "Updated request body written to #{base <> ".new.meta.json"}.",
+        "",
+        "Diff:",
+        diff,
+        "",
+        "Updated request body appended to #{base <> ".new.meta.jsonl"}.",
         "Remove the cassette (e.g. rm #{files}) and re-record or update it to match."
       ]
       |> Enum.join("\n")
 
     raise RuntimeError, message
+  end
+
+  defp generate_body_diff(old_body, new_body) do
+    old_json = Jason.encode!(old_body, pretty: true)
+    new_json = Jason.encode!(new_body, pretty: true)
+
+    old_lines = String.split(old_json, "\n")
+    new_lines = String.split(new_json, "\n")
+
+    # Use Myers diff algorithm via List.myers_difference
+    diff = List.myers_difference(old_lines, new_lines)
+
+    diff
+    |> Enum.flat_map(fn
+      {:eq, lines} ->
+        # Show up to 2 lines of context around changes
+        Enum.map(lines, &"  #{&1}")
+
+      {:del, lines} ->
+        Enum.map(lines, &"- #{&1}")
+
+      {:ins, lines} ->
+        Enum.map(lines, &"+ #{&1}")
+    end)
+    # Limit to 100 lines to avoid overwhelming output
+    |> Enum.take(100)
+    |> Enum.join("\n")
   end
 
   defp cassette_available?(cassette, index, type) do
@@ -209,12 +257,23 @@ defmodule Aquila.Transport.Record do
       url: req.url,
       model: extract_model(Map.get(req, :body)),
       body_hash: body_hash,
-      body: Map.get(req, :body),
+      body: normalize_body(Map.get(req, :body)),
       headers: normalize_headers(req.headers),
       method: Atom.to_string(method)
     }
 
     Cassette.write_meta(cassette, index, meta)
+  end
+
+  # Normalize body by encoding with StableJason and decoding back to ensure
+  # keys are in alphabetical order. This makes cassettes independent of how
+  # the upstream API sends JSON.
+  defp normalize_body(nil), do: nil
+
+  defp normalize_body(body) when is_map(body) do
+    body
+    |> StableJason.encode!(sorter: :asc)
+    |> Jason.decode!()
   end
 
   defp call_inner(:post, req), do: inner_transport().post(req)
@@ -273,46 +332,57 @@ defmodule Aquila.Transport.Record do
   defp extract_model(body) when is_map(body), do: body[:model] || body["model"]
   defp extract_model(_), do: nil
 
-  defp serialize_event(%{type: :event, payload: payload}),
-    do: %{"type" => "event", "payload" => payload}
+  defp serialize_event(%{type: :event, payload: payload}, request_id),
+    do: %{"type" => "event", "payload" => payload, "request_id" => request_id}
 
-  defp serialize_event(%{type: :event} = event),
-    do: %{"type" => "event", "payload" => Map.drop(event, [:type])}
+  defp serialize_event(%{type: :event} = event, request_id),
+    do: %{"type" => "event", "payload" => Map.drop(event, [:type]), "request_id" => request_id}
 
-  defp serialize_event(%{type: :delta, content: content}),
-    do: %{"type" => "delta", "content" => content}
+  defp serialize_event(%{type: :delta, content: content}, request_id),
+    do: %{"type" => "delta", "content" => content, "request_id" => request_id}
 
-  defp serialize_event(%{type: :message, content: content}),
-    do: %{"type" => "message", "content" => content}
+  defp serialize_event(%{type: :message, content: content}, request_id),
+    do: %{"type" => "message", "content" => content, "request_id" => request_id}
 
-  defp serialize_event(%{type: :tool_call} = event),
+  defp serialize_event(%{type: :tool_call} = event, request_id),
     do: %{
       "type" => "tool_call",
       "id" => event[:id],
       "name" => event[:name],
       "args_fragment" => event[:args_fragment],
-      "call_id" => event[:call_id]
+      "call_id" => event[:call_id],
+      "request_id" => request_id
     }
 
-  defp serialize_event(%{type: :tool_call_end} = event),
+  defp serialize_event(%{type: :tool_call_end} = event, request_id),
     do: %{
       "type" => "tool_call_end",
       "id" => event[:id],
       "name" => event[:name],
       "args" => event[:args],
-      "call_id" => event[:call_id]
+      "call_id" => event[:call_id],
+      "request_id" => request_id
     }
 
-  defp serialize_event(%{type: :response_ref, id: id}),
-    do: %{"type" => "response_ref", "id" => id}
+  defp serialize_event(%{type: :response_ref, id: id}, request_id),
+    do: %{"type" => "response_ref", "id" => id, "request_id" => request_id}
 
-  defp serialize_event(%{type: :usage, usage: usage}), do: %{"type" => "usage", "usage" => usage}
+  defp serialize_event(%{type: :usage, usage: usage}, request_id),
+    do: %{"type" => "usage", "usage" => usage, "request_id" => request_id}
 
-  defp serialize_event(%{type: :done} = event),
-    do: %{"type" => "done", "status" => event[:status], "meta" => event[:meta]}
+  defp serialize_event(%{type: :done} = event, request_id),
+    do: %{
+      "type" => "done",
+      "status" => event[:status],
+      "meta" => event[:meta],
+      "request_id" => request_id
+    }
 
-  defp serialize_event(%{type: :error, error: error}), do: %{"type" => "error", "error" => error}
-  defp serialize_event(other), do: %{"type" => "event", "payload" => other}
+  defp serialize_event(%{type: :error, error: error}, request_id),
+    do: %{"type" => "error", "error" => error, "request_id" => request_id}
+
+  defp serialize_event(other, request_id),
+    do: %{"type" => "event", "payload" => other, "request_id" => request_id}
 
   defp fetch_cassette(opts) do
     case Keyword.get(opts, :cassette) do

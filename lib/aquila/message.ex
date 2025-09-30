@@ -81,7 +81,8 @@ defmodule Aquila.Message do
   """
   @spec to_chat_map(t()) :: map()
   def to_chat_map(%__MODULE__{role: role, content: content, name: name}) do
-    map = %{role: Atom.to_string(role), content: content}
+    # Keys are ordered alphabetically to match StableJason sorting
+    map = %{content: content, role: Atom.to_string(role)}
 
     case name do
       nil -> map

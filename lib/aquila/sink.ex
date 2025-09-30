@@ -78,12 +78,16 @@ defmodule Aquila.Sink do
   def notify({:fun, fun}, event, ref), do: fun.(event, ref)
 
   def notify({:pid, pid, opts}, event, ref) do
-    send(pid, format(event, ref, opts))
+    message = format(event, ref, opts)
+    message = maybe_transform(message, opts)
+    if message, do: send(pid, message)
     :ok
   end
 
   def notify({:collector, pid, opts}, event, ref) do
-    send(pid, format(event, ref, opts))
+    message = format(event, ref, opts)
+    message = maybe_transform(message, opts)
+    if message, do: send(pid, message)
     :ok
   end
 
@@ -94,6 +98,16 @@ defmodule Aquila.Sink do
 
   defp format({:done, text, meta}, ref, opts) do
     payload = {:aquila_done, text, meta, ref}
+    maybe_with_ref(payload, opts)
+  end
+
+  defp format({:event, %{type: :tool_call_start} = map}, ref, opts) do
+    payload = {:aquila_tool_call, :start, map, ref}
+    maybe_with_ref(payload, opts)
+  end
+
+  defp format({:event, %{type: :tool_call_result} = map}, ref, opts) do
+    payload = {:aquila_tool_call, :result, map, ref}
     maybe_with_ref(payload, opts)
   end
 
@@ -115,11 +129,27 @@ defmodule Aquila.Sink do
     end
   end
 
+  defp maybe_with_ref({tag, status, value, ref}, opts) when is_atom(status) do
+    # Handle {:aquila_tool_call, :start/:result, data, ref}
+    if Keyword.get(opts, :with_ref, true) do
+      {tag, status, value, ref}
+    else
+      {tag, status, value}
+    end
+  end
+
   defp maybe_with_ref({tag, value, meta, ref}, opts) do
     if Keyword.get(opts, :with_ref, true) do
       {tag, value, meta, ref}
     else
       {tag, value, meta}
+    end
+  end
+
+  defp maybe_transform(message, opts) do
+    case Keyword.get(opts, :transform) do
+      nil -> message
+      fun when is_function(fun, 1) -> fun.(message)
     end
   end
 end

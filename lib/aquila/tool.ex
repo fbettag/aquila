@@ -6,15 +6,15 @@ defmodule Aquila.Tool do
   payload compatible with the Responses API tool-calling contract.
   """
 
-  @enforce_keys [:name, :parameters, :fun]
-  defstruct [:name, :description, :parameters, :fun]
+  @enforce_keys [:name, :parameters, :function]
+  defstruct [:name, :description, :parameters, :function]
 
   @typedoc "JSON-function definition used when exposing tools to the model."
   @type t :: %__MODULE__{
           name: String.t(),
           description: String.t() | nil,
           parameters: map(),
-          fun: (map() -> any()) | (map(), any() -> any())
+          function: (map() -> any()) | (map(), any() -> any())
         }
 
   @doc """
@@ -30,8 +30,11 @@ defmodule Aquila.Tool do
   """
   @spec new(String.t(), keyword()) :: t()
   def new(name, opts) when is_list(opts) do
-    {fun, remaining_opts} =
+    {function, remaining_opts} =
       cond do
+        Keyword.has_key?(opts, :function) ->
+          Keyword.pop(opts, :function)
+
         Keyword.has_key?(opts, :fn) ->
           Keyword.pop(opts, :fn)
 
@@ -39,19 +42,19 @@ defmodule Aquila.Tool do
           Keyword.pop(opts, :fun)
 
         true ->
-          raise ArgumentError, "tool requires :fn callback"
+          raise ArgumentError, "tool requires :function callback"
       end
 
-    new(name, remaining_opts, fun)
+    new(name, remaining_opts, function)
   end
 
   @spec new(String.t(), (map() -> any())) :: t()
-  def new(name, fun) when is_function(fun, 1), do: new(name, [], fun)
-  def new(name, fun) when is_function(fun, 2), do: new(name, [], fun)
+  def new(name, function) when is_function(function, 1), do: new(name, [], function)
+  def new(name, function) when is_function(function, 2), do: new(name, [], function)
 
   @spec new(String.t(), keyword(), (map() -> any())) :: t()
-  def new(name, opts, fun)
-      when is_binary(name) and (is_function(fun, 1) or is_function(fun, 2)) do
+  def new(name, opts, function)
+      when is_binary(name) and (is_function(function, 1) or is_function(function, 2)) do
     parameters =
       Keyword.get(opts, :parameters) ||
         raise ArgumentError, "tool requires :parameters (JSON schema map)"
@@ -62,7 +65,7 @@ defmodule Aquila.Tool do
       name: name,
       description: Keyword.get(opts, :description),
       parameters: normalized_parameters,
-      fun: fun
+      function: function
     )
   end
 

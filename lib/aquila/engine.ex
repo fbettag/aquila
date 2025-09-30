@@ -123,17 +123,21 @@ defmodule Aquila.Engine do
   defp start_stream(%State{} = state) do
     ref = state.ref
 
-    {:ok, _pid} =
-      Task.start(fn ->
+    task =
+      Task.async(fn ->
         try do
           {_final, response} = run_pipeline(%{state | stream?: true})
           Sink.notify(state.sink, {:done, response.text, response.meta}, ref)
+          {:ok, response}
         rescue
           exception ->
             Sink.notify(state.sink, {:error, %{exception: exception}}, ref)
             reraise(exception, __STACKTRACE__)
         end
       end)
+
+    # Store task reference so caller can await if needed
+    Process.put({:aquila_stream_task, ref}, task)
 
     {:ok, ref}
   end
@@ -167,6 +171,11 @@ defmodule Aquila.Engine do
         raise_error(state, state.error)
 
       state.status in [:completed, :succeeded, :done] ->
+        state
+
+      state.status == :requires_action ->
+        # Tools requested but not ready yet - this shouldn't happen since
+        # tool_call_end events should have made them ready, but handle gracefully
         state
 
       true ->
@@ -213,13 +222,19 @@ defmodule Aquila.Engine do
   end
 
   defp handle_event(%State{} = state, %{type: :usage, usage: usage} = event) do
-    merged = Map.merge(state.usage, usage, fn _k, v1, v2 -> v1 + v2 end)
+    merged = Map.merge(state.usage, usage, fn _k, v1, v2 -> merge_usage_value(v1, v2) end)
+    maybe_notify_event(state, %{type: :usage, usage: usage})
     %{state | usage: merged, raw_events: [event | state.raw_events]}
   end
 
-  defp handle_event(%State{} = state, %{type: :tool_call} = event) do
+  defp handle_event(%State{} = state, %{type: :tool_call, id: id} = event) when not is_nil(id) do
     pending = track_tool_call(state.pending_calls, event)
     %{state | pending_calls: pending, raw_events: [event | state.raw_events]}
+  end
+
+  defp handle_event(%State{} = state, %{type: :tool_call} = event) do
+    # Skip tool_call events with null id - they're malformed
+    %{state | raw_events: [event | state.raw_events]}
   end
 
   defp handle_event(%State{} = state, %{type: :tool_call_end} = event) do
@@ -231,10 +246,25 @@ defmodule Aquila.Engine do
     status = Map.get(event, :status, :completed)
     meta = event |> Map.get(:meta, %{}) |> normalize_meta()
 
+    # When finish_reason indicates tool calls, ensure all collecting calls are finalized
+    state =
+      if status == :requires_action do
+        %{state | pending_calls: finalize_all_collecting_calls(state.pending_calls)}
+      else
+        state
+      end
+
+    final_meta =
+      if meta && meta != %{} do
+        Map.merge(state.final_meta, meta)
+      else
+        state.final_meta
+      end
+
     %{
       state
       | status: status,
-        final_meta: Map.merge(state.final_meta, meta),
+        final_meta: final_meta,
         raw_events: [event | state.raw_events]
     }
   end
@@ -253,6 +283,14 @@ defmodule Aquila.Engine do
   defp handle_event(%State{} = state, event) when is_map(event) do
     %{state | raw_events: [event | state.raw_events]}
   end
+
+  defp merge_usage_value(v1, v2) when is_number(v1) and is_number(v2), do: v1 + v2
+
+  defp merge_usage_value(v1, v2) when is_map(v1) and is_map(v2) do
+    Map.merge(v1, v2, fn _k, v1, v2 -> merge_usage_value(v1, v2) end)
+  end
+
+  defp merge_usage_value(_v1, v2), do: v2
 
   defp maybe_notify_chunk(%State{stream?: true, sink: sink, ref: ref}, chunk) do
     Sink.notify(sink, {:chunk, chunk}, ref)
@@ -303,11 +341,19 @@ defmodule Aquila.Engine do
     end
 
     args = call.args || parse_args(call.args_fragment)
+
+    # Emit tool call event before execution
+    Sink.notify(
+      state.sink,
+      {:event, %{type: :tool_call_start, name: call.name, args: args, id: call.id}},
+      state.ref
+    )
+
     start = System.monotonic_time()
 
     result =
       try do
-        invoke_tool_fun(tool.fun, args, state.tool_context)
+        invoke_tool_function(tool.function, args, state.tool_context)
       rescue
         exception ->
           Sink.notify(state.sink, {:error, %{tool: call.name, error: exception}}, state.ref)
@@ -325,6 +371,14 @@ defmodule Aquila.Engine do
 
     payload = %{id: call.id, call_id: call.call_id || call.id, name: call.name, output: output}
 
+    # Emit tool call completion event with result
+    Sink.notify(
+      state.sink,
+      {:event,
+       %{type: :tool_call_result, name: call.name, args: args, output: output, id: call.id}},
+      state.ref
+    )
+
     new_messages =
       case state.endpoint do
         :chat -> messages ++ [Message.function_message(call.name, output)]
@@ -334,12 +388,12 @@ defmodule Aquila.Engine do
     {payload, new_messages}
   end
 
-  defp invoke_tool_fun(fun, args, context) when is_function(fun, 2) do
-    safe_tool_invoke(fn -> fun.(args, context) end)
+  defp invoke_tool_function(function, args, context) when is_function(function, 2) do
+    safe_tool_invoke(fn -> function.(args, context) end)
   end
 
-  defp invoke_tool_fun(fun, args, _context) when is_function(fun, 1) do
-    safe_tool_invoke(fn -> fun.(args) end)
+  defp invoke_tool_function(function, args, _context) when is_function(function, 1) do
+    safe_tool_invoke(fn -> function.(args) end)
   end
 
   defp safe_tool_invoke(fun) do
@@ -359,7 +413,8 @@ defmodule Aquila.Engine do
 
   defp normalize_tool_result({:exception, exception, stacktrace}) do
     formatted = Exception.format(:error, exception, stacktrace)
-    error_payload("Exception raised", formatted)
+    sanitized = sanitize_exception_message(formatted)
+    error_payload("Exception raised", sanitized)
   end
 
   defp normalize_tool_result(value) when is_struct(value) do
@@ -432,6 +487,23 @@ defmodule Aquila.Engine do
     end
   end
 
+  @doc false
+  # Sanitizes exception messages to remove non-deterministic elements like PIDs,
+  # user IDs, timestamps, email addresses, and test-generated names/slugs.
+  # This ensures cassette stability when exceptions occur during testing.
+  defp sanitize_exception_message(message) when is_binary(message) do
+    message
+    |> String.replace(~r/#PID<\d+\.\d+\.\d+>/, "#PID<0.0.0>")
+    |> String.replace(~r/user-\d+@example\.com/, "user-N@example.com")
+    |> String.replace(~r/id: \d+/, "id: N")
+    |> String.replace(~r/~N\[[^\]]+\]/, "~N[TIMESTAMP]")
+    |> String.replace(~r/#Reference<[^>]+>/, "#Reference<REDACTED>")
+    |> String.replace(~r/name: "org\d+"/, "name: \"orgN\"")
+    |> String.replace(~r/slug: "org\d+"/, "slug: \"orgN\"")
+  end
+
+  defp sanitize_exception_message(message), do: message
+
   defp parse_args(nil), do: %{}
 
   defp parse_args(fragment) when is_binary(fragment) do
@@ -454,9 +526,17 @@ defmodule Aquila.Engine do
   end
 
   defp build_body(%State{endpoint: :chat} = state, stream?) do
+    # Convert instructions to system message for Chat Completions API
+    messages =
+      if state.instructions do
+        [Message.new(:system, state.instructions) | state.messages]
+      else
+        state.messages
+      end
+
     base = %{
       model: state.model,
-      messages: Enum.map(state.messages, &Message.to_chat_map/1),
+      messages: Enum.map(messages, &Message.to_chat_map/1),
       stream: stream?
     }
 
@@ -465,8 +545,8 @@ defmodule Aquila.Engine do
         base
       else
         base
-        |> Map.put(:functions, state.tool_defs)
-        |> Map.put(:function_call, "auto")
+        |> Map.put(:tools, state.tool_defs)
+        |> Map.put(:tool_choice, "auto")
       end
 
     Map.put(base, :metadata, state.metadata)
@@ -563,13 +643,13 @@ defmodule Aquila.Engine do
   defp normalize_tool(%Tool{} = tool), do: tool
 
   defp normalize_tool(%{name: name, parameters: parameters} = map) do
-    fun = Map.fetch!(map, :fun)
-    Tool.new(name, [description: Map.get(map, :description), parameters: parameters], fun)
+    function = Map.get(map, :function) || Map.get(map, :fun) || Map.fetch!(map, :fn)
+    Tool.new(name, [description: Map.get(map, :description), parameters: parameters], function)
   end
 
   defp normalize_tool(%{"name" => name, "parameters" => parameters} = map) do
-    fun = Map.fetch!(map, "fun")
-    Tool.new(name, [description: Map.get(map, "description"), parameters: parameters], fun)
+    function = Map.get(map, "function") || Map.get(map, "fun") || Map.fetch!(map, "fn")
+    Tool.new(name, [description: Map.get(map, "description"), parameters: parameters], function)
   end
 
   defp normalize_tool(%{type: type} = map) when is_atom(type) or is_binary(type) do
@@ -831,6 +911,26 @@ defmodule Aquila.Engine do
         call
         |> Map.put(:args, args)
         |> maybe_put(:call_id, Map.get(event, :call_id))
+        |> Map.put(:status, :ready)
+
+      other ->
+        other
+    end)
+  end
+
+  defp finalize_all_collecting_calls(calls) do
+    Enum.map(calls, fn
+      %{status: :collecting, args_fragment: fragment} = call when fragment != "" ->
+        args = parse_args(fragment)
+
+        call
+        |> Map.put(:args, args)
+        |> Map.put(:status, :ready)
+
+      %{status: :collecting} = call ->
+        # Empty args fragment, use empty map
+        call
+        |> Map.put(:args, %{})
         |> Map.put(:status, :ready)
 
       other ->

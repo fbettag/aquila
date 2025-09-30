@@ -116,6 +116,35 @@ defmodule Aquila do
   end
 
   @doc """
+  Waits for a stream to complete (useful for testing/cassette recording).
+
+  This function blocks until the background streaming task finishes.
+  In production, you typically don't need this - just handle events as they arrive.
+  In tests with cassettes, this ensures the full stream is recorded before proceeding.
+
+  Returns `{:ok, response}` when complete or `{:error, reason}` on failure.
+
+  ## Example
+
+      {:ok, ref} = Aquila.stream("Hello", model: "gpt-4o-mini")
+      {:ok, response} = Aquila.await_stream(ref)
+  """
+  @spec await_stream(reference(), timeout()) :: {:ok, Response.t()} | {:error, term()}
+  def await_stream(ref, timeout \\ :infinity) do
+    case Process.get({:aquila_stream_task, ref}) do
+      nil ->
+        {:error, :no_stream_task}
+
+      task ->
+        try do
+          Task.await(task, timeout)
+        catch
+          :exit, reason -> {:error, reason}
+        end
+    end
+  end
+
+  @doc """
   Retrieves a stored Responses API conversation by `response_id`.
 
   Returns `{:ok, %Aquila.Response{}}` when the conversation exists and the
