@@ -91,8 +91,8 @@ defmodule Aquila.StreamSession do
     # Initialize persistence state
     persistence_state = initialize_persistence(persistence, session_id, content, persistence_opts)
 
-    # Build messages for Aquila
-    messages = [%{role: :user, content: content}]
+    # Build messages for Aquila - include conversation history from assistant
+    messages = (assistant.messages || []) ++ [%{role: :user, content: content}]
 
     # Start streaming
     {:ok, ref} =
