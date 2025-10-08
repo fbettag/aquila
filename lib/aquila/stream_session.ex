@@ -124,7 +124,8 @@ defmodule Aquila.StreamSession do
   defp initialize_persistence(nil, _session_id, _content, _opts), do: %{}
 
   defp initialize_persistence(persistence_module, session_id, content, opts) do
-    case persistence_module.on_start(session_id, extract_text_content(content), opts) do
+    # Pass the full content (including files/images) to persistence, not just extracted text
+    case persistence_module.on_start(session_id, content, opts) do
       {:ok, state} ->
         state
 
