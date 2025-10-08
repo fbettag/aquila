@@ -340,14 +340,4 @@ defmodule Aquila.StreamSession do
   defp handle_stream_error(persistence_module, session_id, reason, state, opts) do
     persistence_module.on_error(session_id, reason, state, opts)
   end
-
-  defp extract_text_content(content) when is_binary(content), do: content
-
-  defp extract_text_content(content) when is_list(content) do
-    content
-    |> Enum.filter(&match?(%{type: :text}, &1))
-    |> Enum.map_join("\n", & &1.text)
-  end
-
-  defp extract_text_content(_), do: ""
 end
