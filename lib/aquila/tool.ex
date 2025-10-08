@@ -6,7 +6,7 @@ defmodule Aquila.Tool do
   payload compatible with the Responses API tool-calling contract.
   """
 
-  @enforce_keys [:name, :parameters, :function]
+  @enforce_keys [:name, :function]
   defstruct [:name, :description, :parameters, :function]
 
   @typedoc "JSON-function definition used when exposing tools to the model."
@@ -55,9 +55,7 @@ defmodule Aquila.Tool do
   @spec new(String.t(), keyword(), (map() -> any())) :: t()
   def new(name, opts, function)
       when is_binary(name) and (is_function(function, 1) or is_function(function, 2)) do
-    parameters =
-      Keyword.get(opts, :parameters) ||
-        raise ArgumentError, "tool requires :parameters (JSON schema map)"
+    parameters = Keyword.get(opts, :parameters, %{"type" => "object", "properties" => %{}})
 
     normalized_parameters = normalize_parameters(parameters)
 

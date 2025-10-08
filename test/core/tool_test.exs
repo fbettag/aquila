@@ -70,8 +70,9 @@ defmodule Aquila.ToolTest do
     assert %{"type" => "function"} = Tool.to_openai(map)
   end
 
-  test "new/2 requires parameters" do
-    assert_raise ArgumentError, fn -> Tool.new("echo", fn _ -> :ok end) end
+  test "new/2 defaults to empty object parameters" do
+    tool = Tool.new("echo", fn _ -> :ok end)
+    assert tool.parameters == %{"type" => "object", "properties" => %{}}
   end
 
   test "to_openai normalises function names" do
@@ -161,10 +162,9 @@ defmodule Aquila.ToolTest do
     assert :erlang.fun_info(tool.function)[:arity] == 1
   end
 
-  test "new/2 shorthand with arity-2 function raises without parameters" do
-    assert_raise ArgumentError, "tool requires :parameters (JSON schema map)", fn ->
-      Tool.new("echo", fn _args, _ctx -> :ok end)
-    end
+  test "new/2 shorthand with arity-2 function defaults to empty parameters" do
+    tool = Tool.new("echo", fn _args, _ctx -> :ok end)
+    assert tool.parameters == %{"type" => "object", "properties" => %{}}
   end
 
   test "to_openai handles function with string name key" do
