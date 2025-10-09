@@ -157,6 +157,15 @@ calling `Aquila.ask/2` or `Aquila.stream/2` and define your callbacks with two
 arguments (`fn args, ctx -> ... end`). The context value is forwarded as the
 second argument while existing single-arity callbacks keep working.
 
+Callbacks can now return richer tuples as well as plain binaries or maps:
+
+- `{:ok, value}` is treated the same as returning `value`.
+- `{:error, reason}` yields a normalised error string.
+- `{:ok | :error, value, context_patch}` merges `context_patch` (map or keyword
+  list) into the running `tool_context`. The merged context is also included in
+  the emitted `:tool_call_result` event so you can persist new state.
+- `{:error, changeset}` renders Ecto changeset errors into readable sentences.
+
 Schemas can stay idiomatic Elixir even when they include arrays or nested
 objects—just use atom keys and optional `:required` booleans:
 

@@ -105,7 +105,7 @@ defmodule Aquila.LiveViewTest do
       assert config.supervisor == TestTaskSupervisor
       assert config.pubsub == TestPubSub
       assert config.persistence == nil
-      assert config.timeout == 60_000
+      assert config.timeout == 120_000
       assert config.forward_to_component == nil
     end
   end

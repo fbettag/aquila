@@ -121,3 +121,14 @@ logger =
 
 Single-arity callbacks continue to work; only supply `tool_context:` when you
 need to inject application state or dependencies into the tool execution.
+
+Tool callbacks may return binaries or maps, or tuples that include a context
+patch:
+
+- `{:ok, value}` behaves like returning `value`.
+- `{:error, reason}` is normalised into a deterministic error string.
+- `{:ok | :error, value, context_patch}` merges `context_patch` into the active
+  `tool_context` and includes both the patch and merged context on the emitted
+  `:tool_call_result` event.
+- `{:error, changeset}` turns Ecto validation errors into readable text without
+  extra plumbing.

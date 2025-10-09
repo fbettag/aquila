@@ -39,13 +39,14 @@ defmodule Aquila.StreamSession do
   - `:persistence` - Optional. Module implementing `Aquila.Persistence` behaviour
   - `:persistence_opts` - Optional. Options passed to persistence callbacks
   - `:on_complete` - Optional. Function called when streaming completes
-  - `:timeout` - Optional. Timeout for the streaming request (default: 60_000ms)
+  - `:timeout` - Optional. Timeout for the streaming request (default: 120_000ms)
   """
 
   require Logger
 
   # Ensure Phoenix.PubSub is compiled (optional dependency)
   _ = Code.ensure_loaded(Phoenix.PubSub)
+  @default_timeout 120_000
 
   @doc """
   Starts a supervised streaming session.
@@ -62,7 +63,7 @@ defmodule Aquila.StreamSession do
     persistence = Keyword.get(opts, :persistence)
     persistence_opts = Keyword.get(opts, :persistence_opts, [])
     on_complete = Keyword.get(opts, :on_complete)
-    timeout = Keyword.get(opts, :timeout, 60_000)
+    timeout = Keyword.get(opts, :timeout, @default_timeout)
 
     Task.Supervisor.start_child(supervisor, fn ->
       handle_stream_loop(

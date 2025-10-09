@@ -116,7 +116,7 @@ defmodule MyAppWeb.ChatLive do
       {:aquila_error, reason, ^ref} -> {:error, ref, reason}
       _other -> await_completion(ref)
     after
-      60_000 -> {:error, ref, :timeout}
+      120_000 -> {:error, ref, :timeout}
     end
   end
 end

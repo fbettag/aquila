@@ -312,10 +312,11 @@ defmodule Aquila.Engine do
   defp execute_tools(%State{} = state) do
     {ready, pending} = Enum.split_with(state.pending_calls, &(&1.status == :ready))
 
-    {payloads, messages} =
-      Enum.map_reduce(ready, state.messages, fn call, msgs ->
-        {payload, new_msgs} = invoke_tool(state, call, msgs)
-        {payload, new_msgs}
+    {payloads, {messages, tool_context}} =
+      Enum.map_reduce(ready, {state.messages, state.tool_context}, fn call, {msgs, ctx} ->
+        state_for_call = %{state | tool_context: ctx}
+        {payload, new_msgs, new_ctx} = invoke_tool(state_for_call, call, msgs)
+        {payload, {new_msgs, new_ctx}}
       end)
 
     payloads = Enum.reverse(payloads)
@@ -330,7 +331,8 @@ defmodule Aquila.Engine do
       updated_state
       | pending_calls: pending,
         status: :in_progress,
-        final_meta: append_tool_meta(state.final_meta, ready)
+        final_meta: append_tool_meta(state.final_meta, ready),
+        tool_context: tool_context
     }
   end
 
@@ -352,7 +354,7 @@ defmodule Aquila.Engine do
 
     start = System.monotonic_time()
 
-    result =
+    {status, value, context_patch} =
       try do
         invoke_tool_function(tool.function, args, state.tool_context)
       rescue
@@ -362,18 +364,8 @@ defmodule Aquila.Engine do
           reraise(exception, __STACKTRACE__)
       end
 
-    case result do
-      {:error, reason} ->
-        Logger.warning("Tool returned error", tool: call.name, reason: inspect(reason))
-
-      {:exception, exception, stacktrace} ->
-        Logger.warning("Tool raised exception",
-          tool: call.name,
-          exception: Exception.format(:error, exception, stacktrace)
-        )
-
-      _ ->
-        :ok
+    if status == :error do
+      Logger.warning("Tool returned error", tool: call.name, reason: value)
     end
 
     duration = System.monotonic_time() - start
@@ -383,15 +375,21 @@ defmodule Aquila.Engine do
       model: state.model
     })
 
-    output = normalize_tool_output(result)
+    output = normalize_tool_output(value)
+    new_context = merge_tool_context(state.tool_context, context_patch)
 
     payload = %{id: call.id, call_id: call.call_id || call.id, name: call.name, output: output}
 
     # Emit tool call completion event with result
+    event_payload =
+      %{type: :tool_call_result, name: call.name, args: args, output: output, id: call.id}
+      |> Map.put(:status, status)
+      |> maybe_put(:context, new_context)
+      |> maybe_put(:context_patch, empty_map_to_nil(context_patch))
+
     Sink.notify(
       state.sink,
-      {:event,
-       %{type: :tool_call_result, name: call.name, args: args, output: output, id: call.id}},
+      {:event, event_payload},
       state.ref
     )
 
@@ -401,7 +399,7 @@ defmodule Aquila.Engine do
         _ -> messages
       end
 
-    {payload, new_messages}
+    {payload, new_messages, new_context}
   end
 
   defp invoke_tool_function(function, args, context) when is_function(function, 2) do
@@ -419,19 +417,37 @@ defmodule Aquila.Engine do
       normalize_tool_result({:exception, exception, __STACKTRACE__})
   end
 
-  defp normalize_tool_result({:ok, value}), do: normalize_tool_result(value)
+  defp normalize_tool_result({:ok, value}) do
+    {:ok, normalize_success_value(value), %{}}
+  end
 
-  defp normalize_tool_result({:error, reason}), do: error_payload("Operation failed", reason)
+  defp normalize_tool_result({:ok, value, context}) do
+    {:ok, normalize_success_value(value), ensure_context_map(context)}
+  end
 
-  defp normalize_tool_result({value, _bindings}), do: normalize_tool_result(value)
+  defp normalize_tool_result({:error, reason}) do
+    {:error, normalize_error_value(reason), %{}}
+  end
+
+  defp normalize_tool_result({:error, reason, context}) do
+    {:error, normalize_error_value(reason), ensure_context_map(context)}
+  end
 
   defp normalize_tool_result({:exception, exception, stacktrace}) do
     formatted = Exception.format(:error, exception, stacktrace)
     sanitized = sanitize_exception_message(formatted)
-    error_payload("Exception raised", sanitized)
+    {:error, error_payload("Exception raised", sanitized), %{}}
   end
 
-  defp normalize_tool_result(value) when is_struct(value) do
+  defp normalize_tool_result({value, _bindings}) do
+    normalize_tool_result(value)
+  end
+
+  defp normalize_tool_result(value) do
+    {:ok, normalize_success_value(value), %{}}
+  end
+
+  defp normalize_success_value(value) when is_struct(value) do
     if ecto_changeset?(value) do
       error_payload("Validation failed", format_changeset_errors(value))
     else
@@ -439,9 +455,28 @@ defmodule Aquila.Engine do
     end
   end
 
-  defp normalize_tool_result(value) when is_binary(value), do: value
-  defp normalize_tool_result(value) when is_map(value), do: value
-  defp normalize_tool_result(value), do: value
+  defp normalize_success_value(value) when is_binary(value), do: value
+  defp normalize_success_value(value) when is_map(value), do: value
+  defp normalize_success_value(value), do: value
+
+  defp normalize_error_value(reason) do
+    error_payload("Operation failed", reason)
+  end
+
+  defp ensure_context_map(nil), do: %{}
+  defp ensure_context_map(map) when is_map(map), do: map
+
+  defp ensure_context_map(keyword) when is_list(keyword) do
+    if Keyword.keyword?(keyword) do
+      Map.new(keyword)
+    else
+      raise ArgumentError, "tool context patch must be a map, got: #{inspect(keyword)}"
+    end
+  end
+
+  defp ensure_context_map(other) do
+    raise ArgumentError, "tool context patch must be a map, got: #{inspect(other)}"
+  end
 
   defp error_payload(header, reason) do
     [header, render_reason(reason)]
@@ -476,7 +511,7 @@ defmodule Aquila.Engine do
       errors =
         module.traverse_errors(changeset, fn {msg, opts} ->
           Enum.reduce(opts, msg, fn {key, value}, acc ->
-            String.replace(acc, "%{#{key}}", to_string(value))
+            String.replace(acc, "%{#{key}}", format_changeset_value(value))
           end)
         end)
 
@@ -500,6 +535,24 @@ defmodule Aquila.Engine do
       inspect(changeset)
     end
   end
+
+  defp format_changeset_value(value) when is_binary(value), do: value
+  defp format_changeset_value(value) when is_atom(value), do: Atom.to_string(value)
+  defp format_changeset_value(value) when is_integer(value), do: Integer.to_string(value)
+  defp format_changeset_value(value) when is_float(value), do: Float.to_string(value)
+
+  defp format_changeset_value({:array, type}) do
+    "array of #{format_changeset_value(type)}"
+  end
+
+  defp format_changeset_value(value) when is_tuple(value) do
+    value
+    |> Tuple.to_list()
+    |> Enum.map(&format_changeset_value/1)
+    |> Enum.join(" ")
+  end
+
+  defp format_changeset_value(value), do: inspect(value)
 
   @doc false
   # Sanitizes exception messages to remove non-deterministic elements like PIDs,
@@ -957,6 +1010,28 @@ defmodule Aquila.Engine do
     tool_info = Enum.map(ready_calls, &Map.take(&1, [:id, :name, :call_id]))
     Map.update(meta, :tool_calls, tool_info, fn existing -> existing ++ tool_info end)
   end
+
+  defp merge_tool_context(current, patch) when patch == %{}, do: current
+  defp merge_tool_context(nil, patch), do: patch
+
+  defp merge_tool_context(current, patch) when is_map(current) do
+    Map.merge(current, patch, fn _key, _old, new -> new end)
+  end
+
+  defp merge_tool_context(current, patch) when is_list(current) do
+    if Keyword.keyword?(current) do
+      current
+      |> Map.new()
+      |> Map.merge(patch, fn _key, _old, new -> new end)
+    else
+      patch
+    end
+  end
+
+  defp merge_tool_context(_current, patch), do: patch
+
+  defp empty_map_to_nil(%{} = map) when map_size(map) == 0, do: nil
+  defp empty_map_to_nil(other), do: other
 
   defp normalize_tool_output(output) when is_binary(output), do: output
 

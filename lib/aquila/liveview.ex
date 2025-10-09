@@ -15,7 +15,7 @@ defmodule Aquila.LiveView do
           supervisor: MyApp.TaskSupervisor,
           pubsub: MyApp.PubSub,
           persistence: MyApp.ChatPersistence,
-          timeout: 60_000,
+          timeout: 120_000,
           forward_to_component: {MyAppWeb.ChatComponent, :chat_id}
 
         # Your LiveView code...
@@ -26,7 +26,7 @@ defmodule Aquila.LiveView do
   - `:supervisor` - Required. Task.Supervisor module for async tasks
   - `:pubsub` - Required. PubSub module for broadcasting events
   - `:persistence` - Optional. Persistence module implementing `Aquila.Persistence`
-  - `:timeout` - Optional. Timeout for streaming requests (default: 60_000ms)
+  - `:timeout` - Optional. Timeout for streaming requests (default: 120_000ms)
   - `:forward_to_component` - Optional. Tuple of `{ComponentModule, assign_key}` to
     forward events to a specific LiveComponent instance
 
@@ -54,11 +54,13 @@ defmodule Aquila.LiveView do
   - `aquila_config/0` - Access the configuration options
   """
 
+  @default_timeout 120_000
+
   defmacro __using__(opts) do
     supervisor = Keyword.fetch!(opts, :supervisor)
     pubsub = Keyword.fetch!(opts, :pubsub)
     persistence = Keyword.get(opts, :persistence)
-    timeout = Keyword.get(opts, :timeout, 60_000)
+    timeout = Keyword.get(opts, :timeout, @default_timeout)
     forward_to_component = Keyword.get(opts, :forward_to_component)
 
     quote do

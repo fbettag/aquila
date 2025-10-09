@@ -149,6 +149,17 @@ application state (current user, DB repos, etc.) that will be injected as the
 second argument to each tool callback. Leave the option unset and existing
 arity-1 tools keep working unchanged.
 
+Callbacks can return strings or maps as before, but they may also use tuples to
+signal success, failure, and context updates:
+
+- `{:ok, value}` behaves the same as returning `value`.
+- `{:error, reason}` is normalised into a deterministic string payload.
+- `{:ok | :error, value, context_patch}` merges `context_patch` (a map or keyword
+  list) into the running `tool_context`, and the patch is echoed on the
+  `:tool_call_result` event so callers can persist the update.
+- `{:error, changeset}` formats Ecto changeset errors into readable sentences,
+  handy when surfacing validation feedback to the model.
+
 ## Streaming Sinks & Telemetry
 
 - `Aquila.Sink.pid/2` – sends tuples such as `{:aquila_chunk, chunk, ref}` to a

@@ -1,3 +1,18 @@
+unless Code.ensure_loaded?(Ecto.Changeset) do
+  defmodule Ecto.Changeset do
+    defstruct [:errors]
+
+    def traverse_errors(%__MODULE__{errors: errors}, mapper) do
+      errors
+      |> Enum.reduce(%{}, fn {field, {msg, opts}}, acc ->
+        formatted = mapper.({msg, opts})
+        Map.update(acc, field, [formatted], &[formatted | &1])
+      end)
+      |> Enum.map(fn {field, messages} -> {field, Enum.reverse(messages)} end)
+    end
+  end
+end
+
 defmodule Aquila.EngineTest do
   use ExUnit.Case, async: false
 
@@ -120,6 +135,64 @@ defmodule Aquila.EngineTest do
     assert response.raw[:events] |> Enum.any?(fn event -> event.type == :tool_call end)
   end
 
+  test "tool context accumulates patches returned from {:ok, result, context}" do
+    script = [
+      [
+        %{
+          type: :tool_call,
+          id: "remember-1",
+          name: "remember",
+          args_fragment: "{}",
+          call_id: "remember-1"
+        },
+        %{
+          type: :tool_call,
+          id: "remember-2",
+          name: "remember",
+          args_fragment: "{}",
+          call_id: "remember-2"
+        },
+        %{type: :done, status: :requires_action, meta: %{}}
+      ],
+      [
+        %{type: :delta, content: "Done!"},
+        %{type: :done, status: :completed, meta: %{}}
+      ]
+    ]
+
+    :persistent_term.put({RoundRobinTransport, :script}, script)
+    Process.put(:engine_test_round, 0)
+
+    parent = self()
+
+    remember =
+      Tool.new("remember", [parameters: %{"type" => "object", "properties" => %{}}], fn _args,
+                                                                                        ctx ->
+        context = ctx || %{events: []}
+        send(parent, {:ctx_seen, context})
+
+        history = Map.get(context, :events, [])
+        marker = "call_#{length(history) + 1}"
+
+        {:ok, "ack #{marker}", %{events: history ++ [marker]}}
+      end)
+
+    response =
+      Engine.run("remember",
+        transport: RoundRobinTransport,
+        tools: [remember],
+        endpoint: :responses,
+        base_url: "https://api.openai.com/v1/responses",
+        tool_context: %{events: []}
+      )
+
+    assert_receive {:ctx_seen, %{events: []}}, 200
+    assert_receive {:ctx_seen, %{events: ["call_1"]}}, 200
+
+    assert response.text == "Done!"
+    assert response.meta[:status] == :completed
+  end
+
   test "tool errors are normalised into deterministic payloads and streamed" do
     error_tool =
       Tool.new("failing", [parameters: tool_schema()], fn _args ->
@@ -162,6 +235,142 @@ defmodule Aquila.EngineTest do
     assert_receive {:aquila_tool_call, :result, %{output: output}, ^ref}
     assert output == "Operation failed\nvalidation failed"
     assert_receive {:aquila_done, "No content", meta, ^ref}
+    assert meta[:status] == :completed
+  end
+
+  test "tool changeset errors are rendered with detailed messages" do
+    script = [
+      [
+        %{
+          type: :tool_call,
+          id: "changeset-call",
+          name: "changeset_tool",
+          args_fragment: "{}",
+          call_id: "changeset-call"
+        },
+        %{type: :done, status: :requires_action, meta: %{}}
+      ],
+      [
+        %{type: :delta, content: "Handled"},
+        %{type: :done, status: :completed, meta: %{}}
+      ]
+    ]
+
+    :persistent_term.put({RoundRobinTransport, :script}, script)
+    Process.put(:engine_test_round, 0)
+
+    changeset =
+      %Ecto.Changeset{
+        errors: [
+          name: {"can't be blank", []},
+          tags: {"must be %{type}", [type: {:array, :string}]}
+        ]
+      }
+
+    tool =
+      Tool.new("changeset_tool", [parameters: tool_schema()], fn _args ->
+        {:error, changeset}
+      end)
+
+    sink = Aquila.Sink.collector(self())
+
+    {:ok, ref} =
+      Engine.run("compute",
+        transport: RoundRobinTransport,
+        tools: [tool],
+        endpoint: :responses,
+        base_url: "https://api.openai.com/v1/responses",
+        stream: true,
+        sink: sink
+      )
+
+    assert_receive {:aquila_tool_call, :start, %{name: "changeset_tool"}, ^ref}
+    assert_receive {:aquila_tool_call, :result, %{output: output}, ^ref}
+
+    assert output ==
+             "Operation failed\nName: can't be blank\nTags: must be array of string"
+
+    assert_receive {:aquila_done, "Handled", meta, ^ref}
+    assert meta[:status] == :completed
+  end
+
+  test "tool context patches apply when tool returns {:error, result, context}" do
+    script = [
+      [
+        %{
+          type: :tool_call,
+          id: "remember-1",
+          name: "remember",
+          args_fragment: "{}",
+          call_id: "remember-1"
+        },
+        %{
+          type: :tool_call,
+          id: "remember-2",
+          name: "remember",
+          args_fragment: "{}",
+          call_id: "remember-2"
+        },
+        %{type: :done, status: :requires_action, meta: %{}}
+      ],
+      [
+        %{type: :delta, content: "Recovered"},
+        %{type: :done, status: :completed, meta: %{}}
+      ]
+    ]
+
+    :persistent_term.put({RoundRobinTransport, :script}, script)
+    Process.put(:engine_test_round, 0)
+
+    parent = self()
+    sink = Aquila.Sink.collector(parent)
+
+    remember =
+      Tool.new("remember", [parameters: %{"type" => "object", "properties" => %{}}], fn _args,
+                                                                                        ctx ->
+        context = ctx || %{events: []}
+        send(parent, {:ctx_seen, context})
+
+        history = Map.get(context, :events, [])
+        marker = "call_#{length(history) + 1}"
+        patch = %{events: history ++ [marker]}
+
+        case history do
+          [] -> {:error, "needs retry", patch}
+          _ -> {:ok, "recovered", patch}
+        end
+      end)
+
+    {:ok, ref} =
+      Engine.run("remember",
+        transport: RoundRobinTransport,
+        tools: [remember],
+        endpoint: :responses,
+        base_url: "https://api.openai.com/v1/responses",
+        tool_context: %{events: []},
+        stream: true,
+        sink: sink
+      )
+
+    assert_receive {:aquila_tool_call, :start, %{id: "remember-1"}, ^ref}, 200
+    assert_receive {:ctx_seen, %{events: []}}, 200
+
+    assert_receive {:aquila_tool_call, :result, first_event, ^ref}, 200
+    assert first_event.status == :error
+    assert first_event.output == "Operation failed\nneeds retry"
+    assert first_event.context_patch == %{events: ["call_1"]}
+    assert first_event.context == %{events: ["call_1"]}
+
+    assert_receive {:aquila_tool_call, :start, %{id: "remember-2"}, ^ref}, 200
+    assert_receive {:ctx_seen, %{events: ["call_1"]}}, 200
+
+    assert_receive {:aquila_tool_call, :result, second_event, ^ref}, 200
+    assert second_event.status == :ok
+    assert second_event.output == "recovered"
+    assert second_event.context_patch == %{events: ["call_1", "call_2"]}
+    assert second_event.context == %{events: ["call_1", "call_2"]}
+
+    assert_receive {:aquila_done, "Recovered", meta, ^ref}, 200
     assert meta[:status] == :completed
   end
 end
