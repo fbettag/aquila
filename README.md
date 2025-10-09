@@ -20,7 +20,7 @@ mythological lineup.
   callbacks with `Aquila.Sink`. Telemetry events are emitted for start, chunk,
   tool invocation, and completion.
 - **Deterministic fixtures** – recorder/replay transports capture request and
-  streaming payloads, hash prompts, and fail loudly if recordings drift.
+  streaming payloads, canonicalise prompts, and fail loudly if recordings drift.
 - **Response storage** – pass `store: true` to opt-in to OpenAI’s managed
   response storage and use `Aquila.retrieve_response/2` / `Aquila.delete_response/2`
   to manage conversations later. The flag is ignored automatically for Chat
@@ -164,9 +164,9 @@ Telemetry events fire on `[:aquila, :stream, :start | :chunk | :stop]` and
 The recorder transport automatically captures:
 
 - Streaming events (`<name>.sse.jsonl`)
-- Metadata (URL, headers, body hash) (`<name>.meta.jsonl`)
+- Metadata (URL, headers, normalised request body) (`<name>.meta.jsonl`)
 
-During replay, prompts are hashed again; mismatches raise immediately with a
+During replay, request bodies are normalised again; mismatches raise immediately with a
 list of files to delete. `Aquila.Transport.Record` powers the test suite so
 missing cassettes are recorded automatically while existing fixtures replay
 locally and stay verified.

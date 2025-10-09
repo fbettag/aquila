@@ -43,7 +43,7 @@ requests, and enabling streaming output.
 
    Aquila already defaults to `Aquila.Transport.OpenAI`, so no runtime
    configuration is required. `Record` replays existing cassettes locally and
-   captures fresh ones on demand when the hash mismatches.
+   captures fresh ones on demand when the normalised body diverges.
 
 ## Synchronous Requests
 

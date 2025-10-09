@@ -14,7 +14,7 @@ cleanly inside background processors such as Oban without any custom wrappers.
 - **Transport agnostic** – production code talks to the `Aquila.Transport`
   behaviour, making it easy to swap real HTTP calls for cassette-backed
   replays in tests.
-- **Prompt integrity** – cassette metadata stores canonical request hashes so
+- **Prompt integrity** – cassette metadata stores canonical request bodies so
   mismatched prompts fail fast and guide you toward re-recording.
 - **Streaming first** – even synchronous calls use streaming under the hood,
   enabling telemetry and consistent sink handling.
