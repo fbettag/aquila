@@ -94,6 +94,23 @@ test "deep research run is deterministic" do
 end
 ```
 
+## Testing
+
+1. Export `OPENAI_API_KEY` and `OPENAI_BASE_URL` so Aquila targets the correct
+   endpoint while recording.
+2. Wrap the Deep Research call with `aquila_cassette/3` (as in the example
+   above) to capture both the JSON metadata and SSE timeline.
+3. Record fixtures with:
+
+   ```bash
+   OPENAI_API_KEY=... OPENAI_BASE_URL=... mix test test/integration/deep_research_live_test.exs
+   ```
+
+4. Subsequent `mix test` runs replay the cassette. If you tweak prompts or
+   options, delete the cassette files under
+   `test/support/fixtures/aquila_cassettes/deep_research/` and re-run the command
+   to refresh them. Aquila will raise a diff if recordings fall out of sync.
+
 ## LiveView Integration
 
 `Aquila.StreamSession` broadcasts a new PubSub message when Deep Research emits
