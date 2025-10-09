@@ -72,12 +72,14 @@ defmodule Aquila.Transport.Body do
   defp canonical(body) do
     body
     |> normalize()
+    |> reorder_lists()
     |> Cassette.canonical_term()
   end
 
   defp encode_lines(body) do
     body
     |> normalize()
+    |> reorder_lists()
     |> Jason.encode!(pretty: true)
     |> String.split("\n")
   end
@@ -122,4 +124,35 @@ defmodule Aquila.Transport.Body do
     drop = max(length - count, 0)
     Enum.drop(list, drop)
   end
+
+  defp reorder_lists(term) when is_map(term) do
+    Map.new(term, fn {k, v} -> {k, reorder_lists(v)} end)
+  end
+
+  defp reorder_lists(term) when is_list(term) do
+    term
+    |> Enum.map(&reorder_lists/1)
+    |> maybe_sort_list()
+  end
+
+  defp reorder_lists(term), do: term
+
+  defp maybe_sort_list(list) do
+    if Enum.all?(list, &scalar?/1) do
+      Enum.sort_by(list, &scalar_sort_key/1)
+    else
+      list
+    end
+  end
+
+  defp scalar?(value) when is_binary(value), do: true
+  defp scalar?(value) when is_number(value), do: true
+  defp scalar?(value) when is_boolean(value), do: true
+  defp scalar?(nil), do: true
+  defp scalar?(_), do: false
+
+  defp scalar_sort_key(nil), do: {nil, ""}
+  defp scalar_sort_key(value) when is_binary(value), do: {:string, value}
+  defp scalar_sort_key(value) when is_number(value), do: {:number, value}
+  defp scalar_sort_key(value) when is_boolean(value), do: {:boolean, value}
 end
