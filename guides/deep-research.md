@@ -109,7 +109,7 @@ end
 4. Subsequent `mix test` runs replay the cassette. If you tweak prompts or
    options, delete the cassette files under
    `test/support/fixtures/aquila_cassettes/deep_research/` and re-run the command
-   to refresh them. Aquila will raise a diff if recordings fall out of sync.
+   to refresh them. Aquila raises a diff when recordings fall out of sync.
 
 ## LiveView Integration
 
