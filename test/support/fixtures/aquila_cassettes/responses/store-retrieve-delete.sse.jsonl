@@ -1,13 +1,4 @@
-{"id":"resp_bGl0ZWxsbTpjdXN0b21fbGxtX3Byb3ZpZGVyOm9wZW5haTttb2RlbF9pZDo4ZjA1N2IyOTYzMGIzZDY1YzQyNmM3YWVmYjE4OTBkMzE5Y2U4OGE2NmFmMzY1NGUxNzc1NGIyN2I2Y2RjNmUxO3Jlc3BvbnNlX2lkOnJlc3BfMGU3NzA1ZmE5NTk1NGM1NDAwNjhlNTYwZTYyZTVjODE5MGJhMDI2NjllNzBjZWRjNjM=","request_id":1,"type":"response_ref"}
-{"content":"Hello","request_id":1,"type":"delta"}
-{"content":"!","request_id":1,"type":"delta"}
-{"content":" The","request_id":1,"type":"delta"}
-{"content":" year","request_id":1,"type":"delta"}
-{"content":" is","request_id":1,"type":"delta"}
-{"content":" ","request_id":1,"type":"delta"}
-{"content":"202","request_id":1,"type":"delta"}
-{"content":"3","request_id":1,"type":"delta"}
-{"content":".","request_id":1,"type":"delta"}
-{"content":"Hello! The year is 2023.","request_id":1,"type":"delta"}
-{"meta":{"_fallback_text":"Hello! The year is 2023.","id":"resp_bGl0ZWxsbTpjdXN0b21fbGxtX3Byb3ZpZGVyOm9wZW5haTttb2RlbF9pZDo4ZjA1N2IyOTYzMGIzZDY1YzQyNmM3YWVmYjE4OTBkMzE5Y2U4OGE2NmFmMzY1NGUxNzc1NGIyN2I2Y2RjNmUxO3Jlc3BvbnNlX2lkOnJlc3BfMGU3NzA1ZmE5NTk1NGM1NDAwNjhlNTYwZTYyZTVjODE5MGJhMDI2NjllNzBjZWRjNjM=","metadata":{},"status":"completed","usage":{"input_tokens":21,"input_tokens_details":{"cached_tokens":0},"output_tokens":10,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":31}},"request_id":1,"status":"completed","type":"done"}
-{"meta":null,"request_id":1,"status":"completed","type":"done"}
+{"type":"delta","content":"Hello from Aquila 2025!","request_id":1}
+{"type":"usage","usage":{"prompt_tokens":12,"completion_tokens":6,"total_tokens":18},"request_id":1}
+{"type":"response_ref","id":"resp_test_123","request_id":1}
+{"type":"done","status":"completed","meta":{"id":"resp_test_123","response_id":"resp_test_123","status":"completed"},"request_id":1}

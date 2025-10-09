@@ -1,5 +1,3 @@
-{"content":"Coverage","request_id":1,"type":"delta"}
-{"content":".","request_id":1,"type":"delta"}
-{"meta":{"id":"chatcmpl-CO71Vw7zs2bkwqrnzDvEEhGAk0vgw","model":"gpt-4o-mini"},"request_id":1,"status":"completed","type":"done"}
-{"request_id":1,"type":"usage","usage":{"completion_tokens":2,"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":0,"rejected_prediction_tokens":0},"prompt_tokens":13,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"total_tokens":15}}
-{"meta":null,"request_id":1,"status":"completed","type":"done"}
+{"type":"delta","content":"coverage","request_id":1}
+{"type":"usage","usage":{"prompt_tokens":5,"completion_tokens":1,"total_tokens":6},"request_id":1}
+{"type":"done","status":"completed","meta":{"status":"completed"},"request_id":1}
