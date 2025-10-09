@@ -1,8 +1,9 @@
 # Cassette Recording & Testing
 
 The recorder transport guarantees deterministic tests by persisting request
-and streaming responses to disk. Prompt changes are detected via canonical
-request hashing, forcing you to re-record when inputs drift.
+and streaming responses to disk. Prompt changes are detected by normalising
+the request JSON and comparing it to the stored copy, forcing you to re-record
+when inputs drift.
 
 ## Configuration
 
@@ -16,7 +17,7 @@ config :aquila, :recorder,
 
 - `Aquila.Transport.Record` wraps the inner transport and automatically
   records missing cassettes. Once a cassette exists it replays it locally and
-  verifies the prompt hash on every run.
+  verifies the normalised prompt body on every run.
 - Cassette files live under the configured directory with the pattern
   `<name>-<index>.(json|sse.jsonl|meta.json)`.
   Non-streaming calls now embed the HTTP method in metadata so `GET` and
@@ -28,9 +29,9 @@ config :aquila, :recorder,
 1. When a cassette is **missing**, the recorder delegates to the inner
    transport, mirrors the streaming events to your sink, and saves both the
    HTTP response and the SSE stream.
-2. Metadata captures the model, URL, headers, and a canonical body hash. The
-   hash is compared on subsequent runs.
-3. When a cassette **exists**, the recorder verifies the hash and either
+2. Metadata captures the model, URL, headers, and a canonical copy of the
+   request body. The body is compared structurally on subsequent runs.
+3. When a cassette **exists**, the recorder compares the stored body and either
    replays the payload or raises with instructions to delete stale files.
 
 ## Writing Tests

@@ -27,9 +27,9 @@ defmodule Aquila.Transport.Record do
   @doc """
   Replays or records non-streaming requests depending on cassette availability.
 
-  When the cassette exists the request body hash is validated before the
-  stored response is returned. Otherwise the request is proxied to the inner
-  transport, persisted, and replayed to the caller.
+  When the cassette exists the request body is normalised and compared before
+  the stored response is returned. Otherwise the request is proxied to the
+  inner transport, persisted, and replayed to the caller.
   """
   @impl true
   def post(req), do: handle_http(:post, req)
@@ -45,7 +45,7 @@ defmodule Aquila.Transport.Record do
 
   Missing cassettes trigger a real network call whose events are written to a
   JSONL file while being forwarded to the callback. Subsequent runs verify the
-  prompt hash and stream the persisted events.
+  prompt body and stream the persisted events.
   """
   @impl true
   def stream(%{opts: opts} = req, callback) do
