@@ -129,7 +129,7 @@ defmodule Aquila.TransportRecordReplayTest do
     req = base_req(cassette: cassette, cassette_index: index) |> Map.put(:body, body)
 
     Cassette.write_meta(cassette, index, %{
-      "body_hash" => Cassette.canonical_hash(body),
+      "body" => %{"prompt" => "method"},
       "method" => "post"
     })
 
@@ -147,7 +147,7 @@ defmodule Aquila.TransportRecordReplayTest do
     index = 1
     req = base_req(cassette: cassette, cassette_index: index)
 
-    meta = %{"body_hash" => Cassette.canonical_hash(%{prompt: "different"})}
+    meta = %{"body" => %{"prompt" => "different"}}
     Cassette.write_meta(cassette, index, meta)
     Cassette.ensure_dir(Cassette.sse_path(cassette))
     File.write!(Cassette.sse_path(cassette), "")
@@ -161,7 +161,7 @@ defmodule Aquila.TransportRecordReplayTest do
     body = %{prompt: "decode"}
     req = base_req(cassette: cassette, cassette_index: index) |> Map.put(:body, body)
 
-    meta = %{"body_hash" => Cassette.canonical_hash(body)}
+    meta = %{"body" => %{"prompt" => "decode"}}
     Cassette.write_meta(cassette, index, meta)
 
     events = [
@@ -235,7 +235,7 @@ defmodule Aquila.TransportRecordReplayTest do
     body = %{prompt: "load"}
     req = base_req(cassette: cassette, cassette_index: index) |> Map.put(:body, body)
 
-    Cassette.write_meta(cassette, index, %{"body_hash" => Cassette.canonical_hash(body)})
+    Cassette.write_meta(cassette, index, %{"body" => %{"prompt" => "load"}})
     Cassette.ensure_dir(Cassette.post_path(cassette, index))
     File.write!(Cassette.post_path(cassette, index), Jason.encode!(%{"ok" => true}))
 
@@ -289,7 +289,7 @@ defmodule Aquila.TransportRecordReplayTest do
     assert {:ok, _} = Record.stream(req, fn _ -> :ok end)
   end
 
-  test "record post hashes nil body" do
+  test "record post stores nil body" do
     cassette = "record/nil_body"
 
     req =
@@ -303,12 +303,12 @@ defmodule Aquila.TransportRecordReplayTest do
     assert meta["body"] == nil
   end
 
-  test "replay post handles nil body hash" do
+  test "replay post handles nil body metadata" do
     cassette = "replay/nil_body"
     index = 1
     req = base_req(cassette: cassette, cassette_index: index) |> Map.put(:body, nil)
 
-    Cassette.write_meta(cassette, index, %{"body_hash" => Cassette.canonical_hash(:no_body)})
+    Cassette.write_meta(cassette, index, %{"body" => nil})
     Cassette.ensure_dir(Cassette.post_path(cassette, index))
     File.write!(Cassette.post_path(cassette, index), Jason.encode!(%{"ok" => true}))
 
@@ -325,7 +325,7 @@ defmodule Aquila.TransportRecordReplayTest do
     body = %{prompt: "nil"}
     req = base_req(cassette: cassette, cassette_index: index) |> Map.put(:body, body)
 
-    Cassette.write_meta(cassette, index, %{"body_hash" => Cassette.canonical_hash(body)})
+    Cassette.write_meta(cassette, index, %{"body" => %{"prompt" => "nil"}})
 
     events = [
       %{"type" => "done", "request_id" => index}
@@ -350,7 +350,7 @@ defmodule Aquila.TransportRecordReplayTest do
     body = %{prompt: "extended"}
     req = base_req(cassette: cassette, cassette_index: index) |> Map.put(:body, body)
 
-    Cassette.write_meta(cassette, index, %{"body_hash" => Cassette.canonical_hash(body)})
+    Cassette.write_meta(cassette, index, %{"body" => %{"prompt" => "extended"}})
 
     events = [
       %{"type" => "message", "content" => "msg", "request_id" => index},

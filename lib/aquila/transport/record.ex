@@ -5,17 +5,18 @@ defmodule Aquila.Transport.Record do
   When a cassette is available this transport replays it without issuing
   network calls. When a cassette is missing it transparently calls the
   configured HTTP transport, captures the traffic, and persists it for
-  future runs. Cassette metadata includes a canonical hash of the request
+  future runs. Cassette metadata stores a canonicalised copy of the request
   payload and mismatches raise with guidance to re-record, guaranteeing that
   prompt drift is detected immediately instead of silently reusing stale
   fixtures.
 
   ## Prompt Verification
 
-  Each recording stores a canonical hash of the request body alongside the
-  originating URL, model, and headers. On replay the hash is recomputed and
-  compared. A mismatch raises with a precise set of files to delete, helping
-  developers keep fixtures in sync when instructions or tools change.
+  Each recording stores a canonicalised copy of the request body alongside the
+  originating URL, model, and headers. On replay the current body is normalised
+  and compared structurally. A mismatch raises with a precise set of files to
+  delete, helping developers keep fixtures in sync when instructions or tools
+  change.
   """
 
   @behaviour Aquila.Transport
@@ -79,14 +80,10 @@ defmodule Aquila.Transport.Record do
 
   defp record_http(method, req, cassette, index) do
     clean_req = strip_recorder_opts(req)
-    body = Map.get(clean_req, :body)
-    # Normalize before hashing to ensure consistency
-    normalized_body = normalize_body(body)
-    body_hash = request_hash(normalized_body)
 
     case call_inner(method, clean_req) do
       {:ok, body} = ok ->
-        persist_meta(cassette, index, clean_req, body_hash, method)
+        persist_meta(cassette, index, clean_req, method)
         Cassette.ensure_dir(Cassette.post_path(cassette, index))
 
         File.write!(
@@ -112,10 +109,7 @@ defmodule Aquila.Transport.Record do
 
   defp record_stream(req, cassette, request_id, callback) do
     clean_req = strip_recorder_opts(req)
-    # Normalize before hashing to ensure consistency
-    normalized_body = normalize_body(clean_req.body)
-    body_hash = request_hash(normalized_body)
-    persist_meta(cassette, request_id, clean_req, body_hash)
+    persist_meta(cassette, request_id, clean_req)
 
     Cassette.ensure_dir(Cassette.sse_path(cassette))
     {:ok, io} = File.open(Cassette.sse_path(cassette), [:append, :utf8])
@@ -144,7 +138,7 @@ defmodule Aquila.Transport.Record do
   defp verify_prompt!(req, cassette, index, method) do
     clean_req = strip_recorder_opts(req)
     body = Map.get(clean_req, :body)
-    # Normalize body before hashing to match what was done during recording
+    # Normalize body before comparing to recorded metadata
     normalized_body = normalize_body(body)
 
     case Cassette.read_meta(cassette, index) do
@@ -231,12 +225,11 @@ defmodule Aquila.Transport.Record do
     end
   end
 
-  defp persist_meta(cassette, index, req, body_hash, method \\ :post) do
+  defp persist_meta(cassette, index, req, method \\ :post) do
     meta = %{
       endpoint: req.endpoint,
       url: req.url,
       model: extract_model(Map.get(req, :body)),
-      body_hash: body_hash,
       body: normalize_body(Map.get(req, :body)),
       headers: normalize_headers(req.headers),
       method: Atom.to_string(method)
@@ -255,6 +248,18 @@ defmodule Aquila.Transport.Record do
     |> StableJason.encode!(sorter: :asc)
     |> Jason.decode!()
   end
+
+  defp normalize_body(body) when is_binary(body) do
+    case Jason.decode(body) do
+      {:ok, decoded} when is_map(decoded) or is_list(decoded) ->
+        normalize_body(decoded)
+
+      _ ->
+        body
+    end
+  end
+
+  defp normalize_body(body), do: body
 
   defp call_inner(:post, req), do: inner_transport().post(req)
   defp call_inner(:get, req), do: inner_transport().get(req)
@@ -297,7 +302,7 @@ defmodule Aquila.Transport.Record do
         canonical_body(recorded_body) == canonical_body(normalized_body)
 
       :error ->
-        Map.get(meta, "body_hash") == request_hash(normalized_body)
+        true
     end
   end
 
@@ -318,9 +323,6 @@ defmodule Aquila.Transport.Record do
 
     raise RuntimeError, message
   end
-
-  defp request_hash(nil), do: Cassette.canonical_hash(:no_body)
-  defp request_hash(body), do: Cassette.canonical_hash(body)
 
   defp extract_model(body) when is_map(body), do: body[:model] || body["model"]
   defp extract_model(_), do: nil

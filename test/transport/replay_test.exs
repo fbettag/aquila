@@ -34,7 +34,7 @@ defmodule Aquila.TransportReplayTest do
     request_id = 1
 
     Cassette.write_meta(cassette, request_id, %{
-      "body_hash" => Cassette.canonical_hash(:no_body),
+      "body" => nil,
       "method" => "post"
     })
 
@@ -220,7 +220,7 @@ defmodule Aquila.TransportReplayTest do
     body = Jason.encode!(%{"messages" => [%{"role" => "user", "content" => "ping"}]})
 
     Cassette.write_meta(cassette, request_id, %{
-      "body_hash" => Cassette.canonical_hash(body),
+      "body" => %{"messages" => [%{"role" => "user", "content" => "ping"}]},
       "method" => "post"
     })
 
@@ -237,7 +237,7 @@ defmodule Aquila.TransportReplayTest do
     request_id = 3
 
     Cassette.write_meta(cassette, request_id, %{
-      "body_hash" => Cassette.canonical_hash("different"),
+      "body" => %{"messages" => [%{"role" => "user", "content" => "different"}]},
       "method" => "post"
     })
 
@@ -259,7 +259,7 @@ defmodule Aquila.TransportReplayTest do
     request_id = 4
 
     Cassette.write_meta(cassette, request_id, %{
-      "body_hash" => Cassette.canonical_hash(:no_body),
+      "body" => nil,
       "method" => "post"
     })
 
@@ -278,7 +278,7 @@ defmodule Aquila.TransportReplayTest do
     request_id = 5
 
     Cassette.write_meta(cassette, request_id, %{
-      "body_hash" => Cassette.canonical_hash(:no_body),
+      "body" => nil,
       "method" => nil
     })
 
@@ -324,7 +324,6 @@ defmodule Aquila.TransportReplayTest do
 
     Cassette.write_meta(cassette, request_id, %{
       "body" => recorded_body,
-      "body_hash" => "not-the-real-hash",
       "method" => "post"
     })
 
