@@ -8,8 +8,7 @@ defmodule Aquila.Transport.Replay do
 
   @behaviour Aquila.Transport
 
-  alias Aquila.Transport.Cassette
-  alias StableJason
+  alias Aquila.Transport.{Body, Cassette}
 
   @doc """
   Replays a previously recorded non-streaming response and validates the prompt.
@@ -265,19 +264,16 @@ defmodule Aquila.Transport.Replay do
   defp bodies_match?(meta, body) do
     case Map.fetch(meta, "body") do
       {:ok, recorded_body} ->
-        canonical_body(recorded_body) == canonical_body(body)
+        Body.equivalent?(recorded_body, body)
 
       :error ->
         true
     end
   end
 
-  defp canonical_body(nil), do: Cassette.canonical_term(:no_body)
-  defp canonical_body(body), do: body |> normalize_body() |> Cassette.canonical_term()
-
   defp raise_prompt_mismatch(path, meta, body) do
     recorded_body = Map.get(meta, "body")
-    diff = generate_body_diff(recorded_body, body)
+    diff = Body.diff(recorded_body, body)
 
     message =
       [
@@ -293,58 +289,6 @@ defmodule Aquila.Transport.Replay do
 
     raise RuntimeError, message
   end
-
-  defp generate_body_diff(old_body, new_body) do
-    old_json = old_body |> normalize_for_diff() |> Jason.encode!(pretty: true)
-    new_json = new_body |> normalize_for_diff() |> Jason.encode!(pretty: true)
-
-    old_lines = String.split(old_json, "\n")
-    new_lines = String.split(new_json, "\n")
-
-    List.myers_difference(old_lines, new_lines)
-    |> Enum.flat_map(fn
-      {:eq, lines} -> Enum.map(lines, &"  #{&1}")
-      {:del, lines} -> Enum.map(lines, &"- #{&1}")
-      {:ins, lines} -> Enum.map(lines, &"+ #{&1}")
-    end)
-    |> Enum.take(100)
-    |> Enum.join("\n")
-  end
-
-  defp normalize_for_diff(body) do
-    case normalize_body(body) do
-      nil ->
-        nil
-
-      value when is_map(value) or is_list(value) ->
-        value
-        |> StableJason.encode!(sorter: :asc)
-        |> Jason.decode!()
-
-      other ->
-        other
-    end
-  end
-
-  defp normalize_body(nil), do: nil
-
-  defp normalize_body(body) when is_map(body) do
-    body
-    |> StableJason.encode!(sorter: :asc)
-    |> Jason.decode!()
-  end
-
-  defp normalize_body(body) when is_binary(body) do
-    case Jason.decode(body) do
-      {:ok, decoded} when is_map(decoded) or is_list(decoded) ->
-        normalize_body(decoded)
-
-      _ ->
-        body
-    end
-  end
-
-  defp normalize_body(body), do: body
 
   defp raise_method_mismatch(path, method, meta) do
     recorded = meta["method"] || "post"

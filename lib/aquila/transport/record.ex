@@ -21,7 +21,7 @@ defmodule Aquila.Transport.Record do
 
   @behaviour Aquila.Transport
 
-  alias Aquila.Transport.{Cassette, Replay}
+  alias Aquila.Transport.{Body, Cassette, Replay}
   alias StableJason
 
   @doc """
@@ -139,7 +139,7 @@ defmodule Aquila.Transport.Record do
     clean_req = strip_recorder_opts(req)
     body = Map.get(clean_req, :body)
     # Normalize body before comparing to recorded metadata
-    normalized_body = normalize_body(body)
+    normalized_body = Body.normalize(body)
 
     case Cassette.read_meta(cassette, index) do
       {:ok, meta} ->
@@ -170,8 +170,8 @@ defmodule Aquila.Transport.Record do
 
     # Generate git-style diff of the prompt bodies
     # body is already normalized from verify_prompt!
-    old_body = Map.get(meta, "body")
-    diff = generate_body_diff(old_body, body)
+    recorded_body = Map.get(meta, "body")
+    diff = Body.diff(recorded_body, body)
 
     message =
       [
@@ -186,33 +186,6 @@ defmodule Aquila.Transport.Record do
       |> Enum.join("\n")
 
     raise RuntimeError, message
-  end
-
-  defp generate_body_diff(old_body, new_body) do
-    old_json = Jason.encode!(old_body, pretty: true)
-    new_json = Jason.encode!(new_body, pretty: true)
-
-    old_lines = String.split(old_json, "\n")
-    new_lines = String.split(new_json, "\n")
-
-    # Use Myers diff algorithm via List.myers_difference
-    diff = List.myers_difference(old_lines, new_lines)
-
-    diff
-    |> Enum.flat_map(fn
-      {:eq, lines} ->
-        # Show up to 2 lines of context around changes
-        Enum.map(lines, &"  #{&1}")
-
-      {:del, lines} ->
-        Enum.map(lines, &"- #{&1}")
-
-      {:ins, lines} ->
-        Enum.map(lines, &"+ #{&1}")
-    end)
-    # Limit to 100 lines to avoid overwhelming output
-    |> Enum.take(100)
-    |> Enum.join("\n")
   end
 
   defp cassette_available?(cassette, index, type) do
@@ -230,36 +203,13 @@ defmodule Aquila.Transport.Record do
       endpoint: req.endpoint,
       url: req.url,
       model: extract_model(Map.get(req, :body)),
-      body: normalize_body(Map.get(req, :body)),
+      body: Body.normalize(Map.get(req, :body)),
       headers: normalize_headers(req.headers),
       method: Atom.to_string(method)
     }
 
     Cassette.write_meta(cassette, index, meta)
   end
-
-  # Normalize body by encoding with StableJason and decoding back to ensure
-  # keys are in alphabetical order. This makes cassettes independent of how
-  # the upstream API sends JSON.
-  defp normalize_body(nil), do: nil
-
-  defp normalize_body(body) when is_map(body) do
-    body
-    |> StableJason.encode!(sorter: :asc)
-    |> Jason.decode!()
-  end
-
-  defp normalize_body(body) when is_binary(body) do
-    case Jason.decode(body) do
-      {:ok, decoded} when is_map(decoded) or is_list(decoded) ->
-        normalize_body(decoded)
-
-      _ ->
-        body
-    end
-  end
-
-  defp normalize_body(body), do: body
 
   defp call_inner(:post, req), do: inner_transport().post(req)
   defp call_inner(:get, req), do: inner_transport().get(req)
@@ -299,15 +249,12 @@ defmodule Aquila.Transport.Record do
   defp bodies_match?(meta, normalized_body) do
     case Map.fetch(meta, "body") do
       {:ok, recorded_body} ->
-        canonical_body(recorded_body) == canonical_body(normalized_body)
+        Body.equivalent?(recorded_body, normalized_body)
 
       :error ->
         true
     end
   end
-
-  defp canonical_body(nil), do: Cassette.canonical_term(:no_body)
-  defp canonical_body(body), do: Cassette.canonical_term(body)
 
   defp raise_method_mismatch(path, meta, method) do
     recorded = meta["method"] || "post"
