@@ -41,6 +41,7 @@ defmodule Aquila.LiveView do
   The macro implements these `handle_info/2` callbacks:
 
   - `{:aquila_stream_delta, session_id, content}` - Streaming text chunk
+  - `{:aquila_stream_research_event, session_id, payload}` - Deep Research progress update
   - `{:aquila_stream_tool_call, session_id, tool, result}` - Tool execution
   - `{:aquila_stream_usage, session_id, usage}` - Token usage
   - `{:aquila_stream_complete, session_id}` - Streaming complete
@@ -90,6 +91,27 @@ defmodule Aquila.LiveView do
       # Handle streaming delta events
       def handle_info({:aquila_stream_delta, session_id, content}, socket) do
         unquote(handle_forward_event(:streaming_delta, quote(do: content)))
+      end
+
+      def handle_info({:aquila_stream_research_event, session_id, payload}, socket) do
+        case @aquila_forward_to do
+          nil ->
+            raise ArgumentError,
+                  "Aquila.LiveView received :aquila_stream_research_event but no :forward_to_component was configured. Add forward_to_component: {YourComponent, :assign_key} to handle Deep Research events."
+
+          {component_module, assign_key} ->
+            component_id =
+              Map.get(socket.assigns, assign_key) ||
+                raise ArgumentError,
+                      "Aquila.LiveView could not find #{inspect(assign_key)} in assigns while forwarding :aquila_stream_research_event. Ensure the LiveView sets this assign before streaming starts."
+
+            Phoenix.LiveView.send_update(
+              component_module,
+              [{:id, component_id}, {:streaming_research_event, {session_id, payload}}]
+            )
+
+            {:noreply, socket}
+        end
       end
 
       # Handle tool call start events - ignore for now

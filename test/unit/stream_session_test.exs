@@ -118,6 +118,11 @@ defmodule Aquila.StreamSessionTest do
       end
     end
 
+    def on_event(session_id, category, event, state, _opts) do
+      notify({:persist_research_event, session_id, category, event})
+      {:ok, state}
+    end
+
     defp notify(message) do
       if receiver = :persistent_term.get({__MODULE__, :receiver}, nil) do
         send(receiver, message)
@@ -187,6 +192,40 @@ defmodule Aquila.StreamSessionTest do
     assert_receive {:aquila_stream_usage, "session-1", %{"total_tokens" => 3}}
     assert_receive {:persist_complete, "session-1", "Hello", %{chunks: ["Hello"]}}
     assert_receive {:aquila_stream_complete, "session-1"}
+  end
+
+  test "broadcasts deep research events", %{supervisor: supervisor} do
+    Transport.configure(
+      {:events,
+       [
+         [
+           %{type: :event, payload: %{source: :deep_research, event: :output_item_added}},
+           %{type: :done, status: :completed, meta: %{}}
+         ]
+       ]},
+      receiver: self()
+    )
+
+    assistant = Aquila.Assistant.new(model: "openai/o3-deep-research-2025-06-26")
+
+    Phoenix.PubSub.subscribe(__MODULE__.PubSub, "aquila:session:session-dr")
+
+    {:ok, _pid} =
+      StreamSession.start(
+        supervisor: supervisor,
+        pubsub: __MODULE__.PubSub,
+        session_id: "session-dr",
+        assistant: assistant,
+        content: "Run deep research",
+        persistence: Persistence,
+        timeout: 2_000
+      )
+
+    assert_receive {:aquila_stream_research_event, "session-dr",
+                    %{source: :deep_research, event: :output_item_added}}
+
+    assert_receive {:persist_research_event, "session-dr", :deep_research,
+                    %{source: :deep_research, event: :output_item_added}}
   end
 
   test "propagates transport errors to pubsub and persistence", %{supervisor: supervisor} do

@@ -14,6 +14,7 @@ defmodule Aquila.Persistence do
   3. `on_complete/4` - Called when streaming completes successfully
   4. `on_error/4` - Called if streaming encounters an error
   5. `on_tool_call/5` - Called when a tool is executed (optional)
+  6. `on_event/5` - Called for additional streaming events such as Deep Research updates (optional)
 
   ## State Management
 
@@ -130,5 +131,23 @@ defmodule Aquila.Persistence do
             ) ::
               {:ok, new_state :: map()} | {:error, term()}
 
-  @optional_callbacks on_tool_call: 5
+  @doc """
+  Called when additional streaming events are emitted (e.g. Deep Research progress).
+
+  Implementations can return:
+
+    * `{:ok, new_state}` to update the persistence state
+    * `:ok` to leave the state unchanged
+    * `{:error, reason}` to signal a persistence failure (logged and ignored)
+  """
+  @callback on_event(
+              session_id :: term(),
+              event_category :: atom(),
+              event :: map(),
+              state :: map(),
+              opts :: keyword()
+            ) ::
+              {:ok, new_state :: map()} | :ok | {:error, term()}
+
+  @optional_callbacks on_tool_call: 5, on_event: 5
 end

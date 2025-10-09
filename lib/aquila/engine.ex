@@ -700,7 +700,7 @@ defmodule Aquila.Engine do
     ]
   end
 
-  @builtin_tools ~w(code_interpreter file_search)a
+  @builtin_tools ~w(code_interpreter file_search web_search_preview)a
   @builtin_tool_strings Enum.map(@builtin_tools, &Atom.to_string/1)
 
   defp normalize_tools(list) do

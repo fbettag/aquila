@@ -24,6 +24,7 @@ defmodule Aquila.StreamSession do
   Subscribers to `"aquila:session:\#{session_id}"` will receive:
 
   - `{:aquila_stream_delta, session_id, text}` - Each chunk of streaming text
+  - `{:aquila_stream_research_event, session_id, event}` - Deep Research progress payloads
   - `{:aquila_stream_tool_call, session_id, tool_name, result}` - Tool execution results
   - `{:aquila_stream_usage, session_id, usage}` - Token usage information
   - `{:aquila_stream_complete, session_id}` - Streaming completed successfully
@@ -40,6 +41,10 @@ defmodule Aquila.StreamSession do
   - `:persistence_opts` - Optional. Options passed to persistence callbacks
   - `:on_complete` - Optional. Function called when streaming completes
   - `:timeout` - Optional. Timeout for the streaming request (default: 120_000ms)
+
+  Persistence modules can also implement `c:Aquila.Persistence.on_event/5` to
+  receive Deep Research progress payloads whenever
+  `{:aquila_stream_research_event, ...}` is broadcast.
   """
 
   require Logger
@@ -177,6 +182,40 @@ defmodule Aquila.StreamSession do
           timeout
         )
 
+      {:aquila_event, %{source: :deep_research} = event, ^ref} ->
+        Phoenix.PubSub.broadcast(pubsub, "aquila:session:#{session_id}", {
+          :aquila_stream_research_event,
+          session_id,
+          event
+        })
+
+        new_state = handle_research_event(persistence, session_id, event, state, p_opts)
+
+        handle_stream_events(
+          ref,
+          pubsub,
+          session_id,
+          persistence,
+          new_state,
+          p_opts,
+          on_complete,
+          accumulated,
+          timeout
+        )
+
+      {:aquila_event, _other, ^ref} ->
+        handle_stream_events(
+          ref,
+          pubsub,
+          session_id,
+          persistence,
+          state,
+          p_opts,
+          on_complete,
+          accumulated,
+          timeout
+        )
+
       {:aquila_tool_call, :start, metadata, ^ref} ->
         # Broadcast tool call start
         Phoenix.PubSub.broadcast(pubsub, "aquila:session:#{session_id}", {
@@ -310,6 +349,38 @@ defmodule Aquila.StreamSession do
           Logger.warning("Persistence tool call handling failed",
             session_id: session_id,
             reason: inspect(reason)
+          )
+
+          state
+      end
+    else
+      state
+    end
+  end
+
+  defp handle_research_event(nil, _session_id, _event, state, _opts), do: state
+
+  defp handle_research_event(persistence_module, session_id, event, state, opts) do
+    if function_exported?(persistence_module, :on_event, 5) do
+      case persistence_module.on_event(session_id, :deep_research, event, state, opts) do
+        {:ok, new_state} ->
+          new_state
+
+        :ok ->
+          state
+
+        {:error, reason} ->
+          Logger.warning("Persistence research event handling failed",
+            session_id: session_id,
+            reason: inspect(reason)
+          )
+
+          state
+
+        other ->
+          Logger.warning("Unexpected return from persistence on_event/5",
+            session_id: session_id,
+            result: inspect(other)
           )
 
           state

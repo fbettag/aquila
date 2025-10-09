@@ -31,7 +31,7 @@ defmodule Aquila do
   their native APIs.
   """
 
-  alias Aquila.{Cassette, Engine, Response}
+  alias Aquila.{Cassette, DeepResearch, Engine, Response}
   require Logger
 
   @typedoc "Supported prompt shapes for `ask/2` and `stream/2`."
@@ -207,6 +207,41 @@ defmodule Aquila do
   def delete_response(response_id, opts \\ []) when is_binary(response_id) do
     opts = apply_cassette_defaults(opts)
     dispatch_http(:delete, response_id, opts)
+  end
+
+  @doc """
+  Starts a Deep Research run in background mode.
+
+  This helper ensures the Deep Research model and required tools are configured,
+  then issues a `background: true` request against the Responses API.
+  """
+  @spec deep_research_create(prompt(), options()) :: {:ok, map()} | {:error, term()}
+  def deep_research_create(input, opts \\ []) do
+    DeepResearch.create(input, opts)
+  end
+
+  @doc """
+  Retrieves the current state of a Deep Research run.
+  """
+  @spec deep_research_fetch(String.t(), options()) :: {:ok, Response.t()} | {:error, term()}
+  def deep_research_fetch(response_id, opts \\ []) when is_binary(response_id) do
+    DeepResearch.fetch(response_id, opts)
+  end
+
+  @doc """
+  Cancels a Deep Research run.
+  """
+  @spec deep_research_cancel(String.t(), options()) :: {:ok, map()} | {:error, term()}
+  def deep_research_cancel(response_id, opts \\ []) when is_binary(response_id) do
+    DeepResearch.cancel(response_id, opts)
+  end
+
+  @doc """
+  Streams Deep Research progress using Aquila's streaming pipeline.
+  """
+  @spec deep_research_stream(prompt(), options()) :: {:ok, reference()} | {:error, term()}
+  def deep_research_stream(input, opts \\ []) do
+    DeepResearch.stream(input, opts)
   end
 
   @doc """

@@ -215,6 +215,31 @@ defmodule Aquila.OpenAITransportStreamingTest do
     assert payload.delta == %{"answer" => "42"}
   end
 
+  test "stream emits deep research events" do
+    events = [
+      sse_event(%{
+        "type" => "response.output_item.added",
+        "output_index" => 0,
+        "item" => %{"id" => "rs_1", "type" => "reasoning", "summary" => []},
+        "sequence_number" => 1
+      }),
+      @done_event
+    ]
+
+    events = run_stream(events)
+
+    assert [
+             %{type: :event, payload: payload},
+             %{type: :done, status: :completed}
+           ] = events
+
+    assert payload.source == :deep_research
+    assert payload.event == :output_item_added
+    assert payload.data[:output_index] == 0
+    item = payload.data[:item] || %{}
+    assert (Map.get(item, :type) || Map.get(item, "type")) == "reasoning"
+  end
+
   test "stream accumulates raw error body" do
     events = ["partial body\n\n"]
 

@@ -328,6 +328,10 @@ defmodule Aquila.Transport.OpenAI do
     [%{type: :done, status: :requires_action, meta: Map.delete(payload, "type")}]
   end
 
+  defp normalize_responses(%{"type" => "response.in_progress"} = payload) do
+    [%{type: :event, payload: deep_research_payload(payload)}]
+  end
+
   defp normalize_responses(%{"type" => "response.error", "error" => error}) do
     [%{type: :error, error: error}]
   end
@@ -365,10 +369,15 @@ defmodule Aquila.Transport.OpenAI do
   end
 
   defp normalize_responses(%{"type" => type} = payload) when is_binary(type) do
-    if builtin_tool_type?(type) do
-      [builtin_tool_event(payload)]
-    else
-      []
+    cond do
+      deep_research_event_type?(type) ->
+        [%{type: :event, payload: deep_research_payload(payload)}]
+
+      builtin_tool_type?(type) ->
+        [builtin_tool_event(payload)]
+
+      true ->
+        []
     end
   end
 
@@ -640,6 +649,45 @@ defmodule Aquila.Transport.OpenAI do
       String.starts_with?(type, "response.builtin_tool")
   end
 
+  @deep_research_prefixes [
+    "response.output_item.",
+    "response.web_search_call.",
+    "response.reasoning.",
+    "response.summary.",
+    "response.research_step.",
+    "response.research_message."
+  ]
+
+  defp deep_research_event_type?(type) when is_binary(type) do
+    Enum.any?(@deep_research_prefixes, &String.starts_with?(type, &1))
+  end
+
+  defp deep_research_event_type?(_), do: false
+
+  defp deep_research_payload(%{"type" => type} = payload) do
+    %{
+      source: :deep_research,
+      type: type,
+      event: deep_research_event_name(type),
+      data: payload |> Map.delete("type") |> atomise_deep(),
+      raw: payload
+    }
+  end
+
+  defp deep_research_event_name(type) when is_binary(type) do
+    type
+    |> String.replace_prefix("response.", "")
+    |> String.replace(".", "_")
+    |> String.to_atom()
+  end
+
+  defp atomise_deep(%{} = map) do
+    Enum.into(map, %{}, fn {k, v} -> {atomise_key(k), atomise_deep(v)} end)
+  end
+
+  defp atomise_deep(list) when is_list(list), do: Enum.map(list, &atomise_deep/1)
+  defp atomise_deep(other), do: other
+
   defp compact(map) do
     Enum.reduce(map, %{}, fn
       {_key, nil}, acc -> acc
@@ -667,6 +715,10 @@ defmodule Aquila.Transport.OpenAI do
   defp atomise_key("metadata"), do: :metadata
   defp atomise_key("model"), do: :model
   defp atomise_key("reason"), do: :reason
+  defp atomise_key("output_index"), do: :output_index
+  defp atomise_key("sequence_number"), do: :sequence_number
+  defp atomise_key("item"), do: :item
+  defp atomise_key("response"), do: :response
   defp atomise_key(k) when is_binary(k), do: k
   defp atomise_key(k), do: k
 end

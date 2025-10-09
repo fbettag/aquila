@@ -19,6 +19,9 @@ mythological lineup.
 - **Streaming sinks** – pipe events into LiveView, GenServers, controllers, or custom
   callbacks with `Aquila.Sink`. Telemetry events are emitted for start, chunk,
   tool invocation, and completion.
+- **Deep Research workflows** – orchestrate OpenAI Deep Research models with
+  `Aquila.deep_research_*` helpers, record cassette-backed fixtures, and stream
+  progress into LiveView.
 - **Deterministic fixtures** – recorder/replay transports capture request and
   streaming payloads, canonicalise prompts, and fail loudly if recordings drift.
 - **Response storage** – pass `store: true` to opt-in to OpenAI’s managed
@@ -119,6 +122,24 @@ response = Aquila.ask("Store this", store: true, endpoint: :responses)
 
 Recorder cassettes capture the GET and DELETE traffic as well, so your tests
 stay deterministic even while exercising retrieval workflows.
+
+### Deep Research
+
+Deep Research models perform long-running web research and synthesis. Aquila
+wraps them with dedicated helpers:
+
+- `Aquila.deep_research_create/2` starts a background run (`background: true`).
+- `Aquila.deep_research_fetch/2` polls the run status and yields a
+  `%Aquila.Response{}` when complete.
+- `Aquila.deep_research_cancel/2` stops an in-flight run.
+- `Aquila.deep_research_stream/2` streams progress using the standard sink
+  interface and broadcasts `:aquila_stream_research_event` messages for LiveView.
+
+Use `aquila_cassette/3` while recording tests so the request metadata and SSE
+timeline are stored under `test/support/fixtures/aquila_cassettes/`. Authorization
+headers are automatically replaced with `[redacted]`. The dedicated
+[Deep Research guide](guides/deep-research.md) walks through synchronous,
+streaming, and LiveView patterns in detail.
 
 ## Tool Calling
 
