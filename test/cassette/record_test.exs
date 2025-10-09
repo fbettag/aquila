@@ -163,10 +163,35 @@ defmodule Aquila.TransportRecordTest do
     meta_path = Cassette.meta_path("record-demo")
     meta = meta_path |> File.read!() |> Jason.decode!()
 
-    corrupt_meta = Map.put(meta, "body_hash", "different")
+    corrupt_meta =
+      meta
+      |> Map.put("body", %{"foo" => "changed"})
+      |> Map.put("body_hash", "different")
+
     File.write!(meta_path, Jason.encode!(corrupt_meta))
 
     assert_raise RuntimeError, ~r/Cassette prompt mismatch/, fn -> Record.post(req) end
+  end
+
+  test "replay tolerates hash drift when normalized body matches" do
+    req = base_req(%{body: %{foo: "bar"}})
+    assert {:ok, _} = Record.post(req)
+
+    meta_path = Cassette.meta_path("record-demo")
+
+    meta =
+      meta_path
+      |> File.read!()
+      |> String.trim()
+      |> Jason.decode!()
+
+    tampered =
+      meta
+      |> Map.put("body_hash", "deadbeef")
+
+    File.write!(meta_path, Jason.encode!(tampered))
+
+    assert {:ok, %{"ok" => true}} = Record.post(req)
   end
 
   defp base_req(overrides) do

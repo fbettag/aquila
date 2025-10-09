@@ -9,6 +9,7 @@ defmodule Aquila.Transport.Replay do
   @behaviour Aquila.Transport
 
   alias Aquila.Transport.Cassette
+  alias StableJason
 
   @doc """
   Replays a previously recorded non-streaming response and validates the prompt hash.
@@ -226,29 +227,18 @@ defmodule Aquila.Transport.Replay do
   defp verify_prompt!(%{body: body}, cassette, index, method) do
     case Cassette.read_meta(cassette, index) do
       {:ok, meta} ->
-        hash = request_hash(body)
-
         cond do
           !method_matches?(meta, method) ->
             path = Cassette.meta_path(cassette)
             raise_method_mismatch(path, method, meta)
 
-          meta["body_hash"] == hash ->
+          bodies_match?(meta, body) ->
             :ok
 
           true ->
             path = Cassette.meta_path(cassette)
 
-            message =
-              [
-                "Cassette prompt mismatch for request #{meta["request_id"]} in #{path}.",
-                "Recorded hash: #{meta["body_hash"]}",
-                "Current hash: #{hash}",
-                "Remove the cassette files and re-record."
-              ]
-              |> Enum.join("\n")
-
-            raise RuntimeError, message
+            raise_prompt_mismatch(path, meta, body)
         end
 
       {:error, {:meta_missing, path, _}} ->
@@ -274,6 +264,65 @@ defmodule Aquila.Transport.Replay do
 
   defp method_matches?(_, :post), do: true
   defp method_matches?(_, _method), do: false
+
+  defp bodies_match?(meta, body) do
+    case Map.fetch(meta, "body") do
+      {:ok, recorded_body} ->
+        canonical_body(recorded_body) == canonical_body(body)
+
+      :error ->
+        Map.get(meta, "body_hash") == request_hash(body)
+    end
+  end
+
+  defp canonical_body(nil), do: Cassette.canonical_term(:no_body)
+  defp canonical_body(body), do: Cassette.canonical_term(body)
+
+  defp raise_prompt_mismatch(path, meta, body) do
+    recorded_body = Map.get(meta, "body")
+    diff = generate_body_diff(recorded_body, body)
+
+    message =
+      [
+        "Cassette prompt mismatch for request #{meta["request_id"]} in #{path}.",
+        "Recorded request body no longer matches the current request.",
+        "",
+        "Diff:",
+        diff,
+        "",
+        "Remove the cassette files and re-record."
+      ]
+      |> Enum.join("\n")
+
+    raise RuntimeError, message
+  end
+
+  defp generate_body_diff(old_body, new_body) do
+    old_json = old_body |> normalize_for_diff() |> Jason.encode!(pretty: true)
+    new_json = new_body |> normalize_for_diff() |> Jason.encode!(pretty: true)
+
+    old_lines = String.split(old_json, "\n")
+    new_lines = String.split(new_json, "\n")
+
+    List.myers_difference(old_lines, new_lines)
+    |> Enum.flat_map(fn
+      {:eq, lines} -> Enum.map(lines, &"  #{&1}")
+      {:del, lines} -> Enum.map(lines, &"- #{&1}")
+      {:ins, lines} -> Enum.map(lines, &"+ #{&1}")
+    end)
+    |> Enum.take(100)
+    |> Enum.join("\n")
+  end
+
+  defp normalize_for_diff(nil), do: nil
+
+  defp normalize_for_diff(body) when is_map(body) or is_list(body) do
+    body
+    |> StableJason.encode!(sorter: :asc)
+    |> Jason.decode!()
+  end
+
+  defp normalize_for_diff(body), do: body
 
   defp raise_method_mismatch(path, method, meta) do
     recorded = meta["method"] || "post"

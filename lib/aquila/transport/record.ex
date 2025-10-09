@@ -149,19 +149,17 @@ defmodule Aquila.Transport.Record do
 
     case Cassette.read_meta(cassette, index) do
       {:ok, meta} ->
-        hash = request_hash(normalized_body)
-
         cond do
           !method_matches?(meta, method) ->
             path = Cassette.meta_path(cassette)
             raise_method_mismatch(path, meta, method)
 
-          meta["body_hash"] == hash ->
+          bodies_match?(meta, normalized_body) ->
             :ok
 
           true ->
             path = Cassette.meta_path(cassette)
-            raise_prompt_mismatch(path, meta, normalized_body, hash)
+            raise_prompt_mismatch(path, meta, normalized_body)
         end
 
       {:error, {:meta_missing, path, _}} ->
@@ -172,20 +170,19 @@ defmodule Aquila.Transport.Record do
     end
   end
 
-  defp raise_prompt_mismatch(path, meta, body, hash) do
+  defp raise_prompt_mismatch(path, meta, body) do
     base = Path.rootname(path, ".meta.jsonl")
     files = Enum.join([path, base <> ".sse.jsonl"], " ")
 
     # Generate git-style diff of the prompt bodies
     # body is already normalized from verify_prompt!
-    old_body = meta["body"]
+    old_body = Map.get(meta, "body")
     diff = generate_body_diff(old_body, body)
 
     message =
       [
         "Cassette prompt mismatch for request #{meta["request_id"]} in #{path}.",
-        "Old hash: #{meta["body_hash"]}",
-        "New hash: #{hash}",
+        "Recorded request body no longer matches the current request.",
         "",
         "Diff:",
         diff,
@@ -293,6 +290,19 @@ defmodule Aquila.Transport.Record do
 
   defp method_matches?(_, :post), do: true
   defp method_matches?(_, _method), do: false
+
+  defp bodies_match?(meta, normalized_body) do
+    case Map.fetch(meta, "body") do
+      {:ok, recorded_body} ->
+        canonical_body(recorded_body) == canonical_body(normalized_body)
+
+      :error ->
+        Map.get(meta, "body_hash") == request_hash(normalized_body)
+    end
+  end
+
+  defp canonical_body(nil), do: Cassette.canonical_term(:no_body)
+  defp canonical_body(body), do: Cassette.canonical_term(body)
 
   defp raise_method_mismatch(path, meta, method) do
     recorded = meta["method"] || "post"

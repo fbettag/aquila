@@ -312,4 +312,30 @@ defmodule Aquila.TransportReplayTest do
       Replay.post(req)
     end
   end
+
+  test "post tolerates hash drift when bodies match" do
+    cassette = new_cassette()
+    request_id = 7
+
+    recorded_body = %{
+      "messages" => [%{"role" => "user", "content" => "ping"}],
+      "model" => "gpt-4o-mini"
+    }
+
+    Cassette.write_meta(cassette, request_id, %{
+      "body" => recorded_body,
+      "body_hash" => "not-the-real-hash",
+      "method" => "post"
+    })
+
+    Cassette.post_path(cassette, request_id)
+    |> File.write!(Jason.encode!(%{"ok" => true}))
+
+    req = %{
+      body: %{messages: [%{role: "user", content: "ping"}], model: "gpt-4o-mini"},
+      opts: [cassette: cassette, cassette_index: request_id]
+    }
+
+    assert {:ok, %{"ok" => true}} = Replay.post(req)
+  end
 end
