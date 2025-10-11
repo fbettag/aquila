@@ -115,7 +115,9 @@ defmodule Aquila.Transport.Record do
 
     writer = fn event ->
       serialized = serialize_event(event, request_id)
-      IO.write(io, StableJason.encode!(serialized, sorter: :asc) <> "\n")
+      json_line = StableJason.encode!(serialized, sorter: :asc)
+      Cassette.append_sse_event(cassette, request_id, json_line)
+      IO.write(io, json_line <> "\n")
       callback.(event)
     end
 
@@ -123,6 +125,7 @@ defmodule Aquila.Transport.Record do
       inner_transport().stream(clean_req, writer)
     after
       File.close(io)
+      Cassette.refresh_sse_cache(cassette)
     end
   end
 

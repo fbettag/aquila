@@ -73,24 +73,27 @@ defmodule Aquila.Transport.Replay do
 
   # Deduplicates consecutive done events with the same status
   # This handles cassettes that have duplicate "completed" done events
-  defp deduplicate_done_events(stream) do
-    stream
-    |> Stream.transform(nil, fn line, last_done ->
-      case Jason.decode(line) do
-        {:ok, %{"type" => "done", "status" => status}} ->
-          if status == last_done do
-            # Skip duplicate
-            {[], last_done}
-          else
-            # Emit and track
-            {[line], status}
+  defp deduplicate_done_events(events) do
+    {deduped, _last_status} =
+      Enum.map_reduce(events, nil, fn
+        %{"type" => "done"} = event, last_status ->
+          case Map.fetch(event, "status") do
+            {:ok, status} ->
+              if status == last_status do
+                {nil, last_status}
+              else
+                {event, status}
+              end
+
+            :error ->
+              {event, last_status}
           end
 
-        _ ->
-          # Not a done event, emit it
-          {[line], last_done}
-      end
-    end)
+        event, last_status ->
+          {event, last_status}
+      end)
+
+    Enum.reject(deduped, &is_nil/1)
   end
 
   @doc """
@@ -105,105 +108,104 @@ defmodule Aquila.Transport.Replay do
       request_id = Cassette.next_index(cassette, opts)
       verify_prompt!(req, cassette, request_id, :post)
 
-      # Buffer tool calls to synthesize tool_call_end events
-      # State: {tool_calls_map, current_tool_id, pending_done_event}
-      {tool_calls, _, pending_done} =
-        cassette
-        |> Cassette.sse_path()
-        |> File.stream!()
-        |> Stream.map(&String.trim/1)
-        |> Stream.reject(&(&1 == ""))
-        |> Stream.filter(&matches_request_id?(&1, request_id))
-        |> deduplicate_done_events()
-        |> Enum.reduce({%{}, nil, nil}, fn line, {tool_calls_acc, current_id, buffered_done} ->
-          case Jason.decode!(line) do
-            %{"type" => "meta"} ->
-              {tool_calls_acc, current_id, buffered_done}
+      with {:ok, events} <- Cassette.fetch_sse_events(cassette, request_id) do
+        # Buffer tool calls to synthesize tool_call_end events
+        # State: {tool_calls_map, current_tool_id, pending_done_event}
+        {tool_calls, _, pending_done} =
+          events
+          |> deduplicate_done_events()
+          |> Enum.reduce({%{}, nil, nil}, fn event, {tool_calls_acc, current_id, buffered_done} ->
+            case event do
+              %{"type" => "meta"} ->
+                {tool_calls_acc, current_id, buffered_done}
 
-            %{"type" => "tool_call", "id" => id, "name" => name} = event
-            when not is_nil(id) and not is_nil(name) ->
-              # Start tracking this tool call
-              updated_calls = Map.put(tool_calls_acc, id, %{id: id, name: name, fragments: []})
-              event |> to_event() |> callback.()
-              {updated_calls, id, buffered_done}
+              %{"type" => "tool_call", "id" => id, "name" => name} = event
+              when not is_nil(id) and not is_nil(name) ->
+                # Start tracking this tool call
+                updated_calls = Map.put(tool_calls_acc, id, %{id: id, name: name, fragments: []})
+                event |> to_event() |> callback.()
+                {updated_calls, id, buffered_done}
 
-            %{"type" => "tool_call", "args_fragment" => fragment} = event
-            when not is_nil(fragment) ->
-              # Accumulate fragment for the current tool call
-              # Use call_id if present, otherwise use current_id
-              target_id = Map.get(event, "call_id") || current_id
+              %{"type" => "tool_call", "args_fragment" => fragment} = event
+              when not is_nil(fragment) ->
+                # Accumulate fragment for the current tool call
+                # Use call_id if present, otherwise use current_id
+                target_id = Map.get(event, "call_id") || current_id
 
-              updated_calls =
-                if target_id do
-                  Map.update(tool_calls_acc, target_id, %{fragments: [fragment]}, fn call ->
-                    %{call | fragments: call.fragments ++ [fragment]}
-                  end)
+                updated_calls =
+                  if target_id do
+                    Map.update(tool_calls_acc, target_id, %{fragments: [fragment]}, fn call ->
+                      %{call | fragments: call.fragments ++ [fragment]}
+                    end)
+                  else
+                    tool_calls_acc
+                  end
+
+                event |> to_event() |> callback.()
+                {updated_calls, current_id, buffered_done}
+
+              %{"type" => "done", "status" => "requires_action"} = event ->
+                # Don't emit the done event yet - we need to synthesize tool_call_end first
+                {tool_calls_acc, current_id, event}
+
+              %{"type" => "done"} = event ->
+                # Process done event (duplicates already filtered out by deduplicate_done_events)
+                if buffered_done do
+                  # Synthesize tool_call_end events for all buffered tool calls
+                  synthesize_tool_call_ends(tool_calls_acc, callback)
+
+                  # Now emit the buffered done event
+                  buffered_done |> to_event() |> callback.()
+
+                  # Clear state after processing
+                  {%{}, nil, nil}
                 else
-                  tool_calls_acc
+                  # No buffered done, just emit the event normally
+                  event |> to_event() |> callback.()
+                  {tool_calls_acc, current_id, nil}
                 end
 
-              event |> to_event() |> callback.()
-              {updated_calls, current_id, buffered_done}
+              event ->
+                # Check if we just buffered a requires_action done event
+                if buffered_done do
+                  # Synthesize tool_call_end events for all buffered tool calls
+                  synthesize_tool_call_ends(tool_calls_acc, callback)
 
-            %{"type" => "done", "status" => "requires_action"} = event ->
-              # Don't emit the done event yet - we need to synthesize tool_call_end first
-              {tool_calls_acc, current_id, event}
+                  # Now emit the done event
+                  buffered_done |> to_event() |> callback.()
 
-            %{"type" => "done"} = event ->
-              # Process done event (duplicates already filtered out by deduplicate_done_events)
-              if buffered_done do
-                # Synthesize tool_call_end events for all buffered tool calls
-                synthesize_tool_call_ends(tool_calls_acc, callback)
+                  # Emit the current event
+                  event |> to_event() |> callback.()
 
-                # Now emit the buffered done event
-                buffered_done |> to_event() |> callback.()
+                  # Clear state after processing
+                  {%{}, nil, nil}
+                else
+                  # No buffered done, just emit the event normally
+                  event |> to_event() |> callback.()
+                  {tool_calls_acc, current_id, nil}
+                end
+            end
+          end)
 
-                # Clear state after processing
-                {%{}, nil, nil}
-              else
-                # No buffered done, just emit the event normally
-                event |> to_event() |> callback.()
-                {tool_calls_acc, current_id, nil}
-              end
+        # If we ended with a buffered done event, emit it now
+        if tool_calls != %{} and pending_done do
+          synthesize_tool_call_ends(tool_calls, callback, false)
+          pending_done |> to_event() |> callback.()
+        end
 
-            event ->
-              # Check if we just buffered a requires_action done event
-              if buffered_done do
-                # Synthesize tool_call_end events for all buffered tool calls
-                synthesize_tool_call_ends(tool_calls_acc, callback)
+        {:ok, make_ref()}
+      else
+        {:error, {:sse_missing, path, :not_found}} ->
+          raise "Cassette SSE missing at #{path} for request #{request_id}. Remove cassette and re-record."
 
-                # Now emit the done event
-                buffered_done |> to_event() |> callback.()
+        {:error, {:sse_missing, path, reason}} ->
+          raise "Cassette SSE missing at #{path}: #{inspect(reason)}"
 
-                # Emit the current event
-                event |> to_event() |> callback.()
-
-                # Clear state after processing
-                {%{}, nil, nil}
-              else
-                # No buffered done, just emit the event normally
-                event |> to_event() |> callback.()
-                {tool_calls_acc, current_id, nil}
-              end
-          end
-        end)
-
-      # If we ended with a buffered done event, emit it now
-      if tool_calls != %{} and pending_done do
-        synthesize_tool_call_ends(tool_calls, callback, false)
-        pending_done |> to_event() |> callback.()
+        {:error, reason} ->
+          raise "Unable to load cassette SSE events: #{inspect(reason)}"
       end
-
-      {:ok, make_ref()}
     else
       :no_cassette -> {:error, :missing_cassette}
-    end
-  end
-
-  defp matches_request_id?(line, request_id) do
-    case Jason.decode(line) do
-      {:ok, %{"request_id" => ^request_id}} -> true
-      _ -> false
     end
   end
 

@@ -130,6 +130,9 @@ defmodule Aquila.Transport.Cassette do
             {:error, {:sse_missing, path, reason}}
         end
 
+      [{_, {:cache, :dirty}}] ->
+        :ok
+
       [{_, :missing}] ->
         case File.stat(path) do
           {:ok, _stat} -> load_sse_cache(cassette, path)
@@ -149,28 +152,34 @@ defmodule Aquila.Transport.Cassette do
       result =
         path
         |> File.stream!([], :line)
-        |> Enum.reduce_while(:ok, fn line, acc ->
+        |> Enum.reduce_while(%{}, fn line, acc ->
           trimmed = String.trim(line)
 
-          if trimmed == "" do
-            {:cont, acc}
-          else
-            case Jason.decode(trimmed) do
-              {:ok, %{"request_id" => request_id}} ->
-                :ets.insert(table, {{cassette, request_id}, true})
-                {:cont, acc}
+          cond do
+            trimmed == "" ->
+              {:cont, acc}
 
-              {:error, reason} ->
-                {:halt, {:error, {:sse_decode_failed, path, reason}}}
+            true ->
+              case Jason.decode(trimmed) do
+                {:ok, %{"request_id" => request_id} = event} ->
+                  events = Map.get(acc, request_id, [])
+                  {:cont, Map.put(acc, request_id, [event | events])}
 
-              _ ->
-                {:cont, acc}
-            end
+                {:error, reason} ->
+                  {:halt, {:error, {:sse_decode_failed, path, reason}}}
+
+                _ ->
+                  {:cont, acc}
+              end
           end
         end)
 
       case result do
-        :ok ->
+        %{} = events_by_request ->
+          Enum.each(events_by_request, fn {request_id, events} ->
+            :ets.insert(table, {{cassette, request_id}, Enum.reverse(events)})
+          end)
+
           case File.stat(path) do
             {:ok, %File.Stat{mtime: mtime, size: size}} ->
               :ets.insert(table, {{:loaded, cassette}, {:ok, {mtime, size}}})
@@ -193,17 +202,92 @@ defmodule Aquila.Transport.Cassette do
   @spec cache_sse_request(cassette(), index()) :: :ok
   def cache_sse_request(cassette, request_id) do
     table = ensure_sse_table()
-    :ets.insert(table, {{cassette, request_id}, true})
+    :ets.insert(table, {{cassette, request_id}, []})
+    :ets.insert(table, {{:loaded, cassette}, {:cache, :dirty}})
+    :ok
+  end
+
+  @doc false
+  @spec append_sse_event(cassette(), index(), map() | String.t()) :: :ok
+  def append_sse_event(cassette, request_id, event) when is_map(event) do
+    event
+    |> stringify_top_level_keys()
+    |> StableJason.encode!(sorter: :asc)
+    |> append_sse_event(cassette, request_id)
+  end
+
+  def append_sse_event(cassette, request_id, json_line) when is_binary(json_line) do
+    trimmed = String.trim(json_line)
+
+    if trimmed == "" do
+      :ok
+    else
+      decoded =
+        case Jason.decode(trimmed) do
+          {:ok, map} -> map
+          {:error, reason} -> raise "Failed to decode SSE event JSON: #{inspect(reason)}"
+        end
+
+      insert_sse_event(cassette, request_id, decoded)
+    end
+  end
+
+  defp insert_sse_event(cassette, request_id, decoded_event) do
+    table = ensure_sse_table()
+    key = {cassette, request_id}
+
+    next_events =
+      case :ets.lookup(table, key) do
+        [{^key, events}] when is_list(events) -> events ++ [decoded_event]
+        _ -> [decoded_event]
+      end
+
+    :ets.insert(table, {key, next_events})
+    :ets.insert(table, {{:loaded, cassette}, {:cache, :dirty}})
+    :ok
+  end
+
+  @doc false
+  @spec refresh_sse_cache(cassette()) :: :ok
+  def refresh_sse_cache(cassette) do
+    table = ensure_sse_table()
 
     case File.stat(sse_path(cassette)) do
       {:ok, %File.Stat{mtime: mtime, size: size}} ->
         :ets.insert(table, {{:loaded, cassette}, {:ok, {mtime, size}}})
 
       {:error, _reason} ->
-        :ets.delete(table, {:loaded, cassette})
+        :ets.insert(table, {{:loaded, cassette}, :missing})
     end
 
     :ok
+  end
+
+  @spec fetch_sse_events(cassette(), index()) :: {:ok, [map()]} | {:error, term()}
+  def fetch_sse_events(cassette, request_id) do
+    table = ensure_sse_table()
+    key = {cassette, request_id}
+    path = sse_path(cassette)
+
+    case ensure_sse_loaded(cassette, path) do
+      :ok ->
+        case :ets.lookup(table, key) do
+          [{^key, events}] when is_list(events) ->
+            {:ok, events}
+
+          [] ->
+            {:error, {:sse_missing, path, :not_found}}
+
+          _other ->
+            {:error, {:sse_missing, path, :invalid_entry}}
+        end
+
+      :missing ->
+        {:error, {:sse_missing, path, :not_found}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   defp reset_meta_cache(:all) do
@@ -301,13 +385,16 @@ defmodule Aquila.Transport.Cassette do
     key = {cassette, request_id}
 
     case :ets.lookup(table, key) do
-      [{^key, true}] ->
+      [{^key, events}] when is_list(events) ->
         true
 
       [] ->
         case ensure_sse_loaded(cassette, path) do
           :ok ->
-            match?([{^key, true}], :ets.lookup(table, key))
+            case :ets.lookup(table, key) do
+              [{^key, events}] when is_list(events) -> true
+              _ -> false
+            end
 
           :missing ->
             false
@@ -315,6 +402,9 @@ defmodule Aquila.Transport.Cassette do
           {:error, _reason} ->
             false
         end
+
+      _other ->
+        false
     end
   end
 
