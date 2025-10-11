@@ -71,31 +71,6 @@ defmodule Aquila.Transport.Replay do
     end)
   end
 
-  # Deduplicates consecutive done events with the same status
-  # This handles cassettes that have duplicate "completed" done events
-  defp deduplicate_done_events(events) do
-    {deduped, _last_status} =
-      Enum.map_reduce(events, nil, fn
-        %{"type" => "done"} = event, last_status ->
-          case Map.fetch(event, "status") do
-            {:ok, status} ->
-              if status == last_status do
-                {nil, last_status}
-              else
-                {event, status}
-              end
-
-            :error ->
-              {event, last_status}
-          end
-
-        event, last_status ->
-          {event, last_status}
-      end)
-
-    Enum.reject(deduped, &is_nil/1)
-  end
-
   @doc """
   Streams recorded SSE events to the provided callback.
 
@@ -112,9 +87,8 @@ defmodule Aquila.Transport.Replay do
         # Buffer tool calls to synthesize tool_call_end events
         # State: {tool_calls_map, current_tool_id, pending_done_event}
         {tool_calls, _, pending_done} =
-          events
-          |> deduplicate_done_events()
-          |> Enum.reduce({%{}, nil, nil}, fn event, {tool_calls_acc, current_id, buffered_done} ->
+          Enum.reduce(events, {%{}, nil, nil}, fn event,
+                                                  {tool_calls_acc, current_id, buffered_done} ->
             case event do
               %{"type" => "meta"} ->
                 {tool_calls_acc, current_id, buffered_done}
@@ -149,7 +123,7 @@ defmodule Aquila.Transport.Replay do
                 {tool_calls_acc, current_id, event}
 
               %{"type" => "done"} = event ->
-                # Process done event (duplicates already filtered out by deduplicate_done_events)
+                # Process done event (duplicates already filtered out when caching)
                 if buffered_done do
                   # Synthesize tool_call_end events for all buffered tool calls
                   synthesize_tool_call_ends(tool_calls_acc, callback)

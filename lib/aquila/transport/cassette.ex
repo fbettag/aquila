@@ -38,8 +38,11 @@ defmodule Aquila.Transport.Cassette do
 
       [{_, :missing}] ->
         case File.stat(path) do
-          {:ok, _stat} -> load_meta_cache(cassette, path)
-          {:error, _reason} -> :missing
+          {:ok, _stat} ->
+            load_meta_cache(cassette, path)
+
+          {:error, _reason} ->
+            :missing
         end
 
       [] ->
@@ -135,8 +138,11 @@ defmodule Aquila.Transport.Cassette do
 
       [{_, :missing}] ->
         case File.stat(path) do
-          {:ok, _stat} -> load_sse_cache(cassette, path)
-          {:error, _reason} -> :missing
+          {:ok, _stat} ->
+            load_sse_cache(cassette, path)
+
+          {:error, _reason} ->
+            :missing
         end
 
       [] ->
@@ -177,7 +183,9 @@ defmodule Aquila.Transport.Cassette do
       case result do
         %{} = events_by_request ->
           Enum.each(events_by_request, fn {request_id, events} ->
-            :ets.insert(table, {{cassette, request_id}, Enum.reverse(events)})
+            events = Enum.reverse(events)
+            entry = build_sse_entry(events)
+            :ets.insert(table, {{cassette, request_id}, entry})
           end)
 
           case File.stat(path) do
@@ -202,7 +210,7 @@ defmodule Aquila.Transport.Cassette do
   @spec cache_sse_request(cassette(), index()) :: :ok
   def cache_sse_request(cassette, request_id) do
     table = ensure_sse_table()
-    :ets.insert(table, {{cassette, request_id}, []})
+    :ets.insert(table, {{cassette, request_id}, %{raw: [], dedup: [], last_status: nil}})
     :ets.insert(table, {{:loaded, cassette}, {:cache, :dirty}})
     :ok
   end
@@ -210,10 +218,7 @@ defmodule Aquila.Transport.Cassette do
   @doc false
   @spec append_sse_event(cassette(), index(), map() | String.t()) :: :ok
   def append_sse_event(cassette, request_id, event) when is_map(event) do
-    event
-    |> stringify_top_level_keys()
-    |> StableJason.encode!(sorter: :asc)
-    |> append_sse_event(cassette, request_id)
+    insert_sse_event(cassette, request_id, event)
   end
 
   def append_sse_event(cassette, request_id, json_line) when is_binary(json_line) do
@@ -236,13 +241,33 @@ defmodule Aquila.Transport.Cassette do
     table = ensure_sse_table()
     key = {cassette, request_id}
 
-    next_events =
+    normalized =
+      decoded_event
+      |> stringify_top_level_keys()
+      |> normalize_done_status()
+
+    entry =
       case :ets.lookup(table, key) do
-        [{^key, events}] when is_list(events) -> events ++ [decoded_event]
-        _ -> [decoded_event]
+        [{^key, %{raw: raw, dedup: dedup, last_status: last_status}}] ->
+          {next_dedup, next_status} = append_dedup(dedup, normalized, last_status)
+
+          %{
+            raw: raw ++ [normalized],
+            dedup: next_dedup,
+            last_status: next_status
+          }
+
+        _ ->
+          {dedup, next_status} = append_dedup([], normalized, nil)
+
+          %{
+            raw: [normalized],
+            dedup: dedup,
+            last_status: next_status
+          }
       end
 
-    :ets.insert(table, {key, next_events})
+    :ets.insert(table, {key, entry})
     :ets.insert(table, {{:loaded, cassette}, {:cache, :dirty}})
     :ok
   end
@@ -272,7 +297,7 @@ defmodule Aquila.Transport.Cassette do
     case ensure_sse_loaded(cassette, path) do
       :ok ->
         case :ets.lookup(table, key) do
-          [{^key, events}] when is_list(events) ->
+          [{^key, %{dedup: events}}] when is_list(events) ->
             {:ok, events}
 
           [] ->
@@ -334,6 +359,45 @@ defmodule Aquila.Transport.Cassette do
     |> Enum.into(%{})
   end
 
+  defp normalize_done_status(%{"type" => "done"} = event) do
+    case Map.fetch(event, "status") do
+      {:ok, status} when is_atom(status) -> Map.put(event, "status", Atom.to_string(status))
+      {:ok, _status} -> event
+      _ -> event
+    end
+  end
+
+  defp normalize_done_status(event), do: event
+
+  defp append_dedup(dedup, %{"type" => "done"} = event, last_status) do
+    case Map.fetch(event, "status") do
+      {:ok, status} when is_binary(status) ->
+        if status == last_status do
+          {dedup, last_status}
+        else
+          {dedup ++ [event], status}
+        end
+
+      _ ->
+        {dedup ++ [event], last_status}
+    end
+  end
+
+  defp append_dedup(dedup, event, last_status), do: {dedup ++ [event], last_status}
+
+  defp build_sse_entry(events) when is_list(events) do
+    {dedup, last_status} =
+      Enum.reduce(events, {[], nil}, fn event, {acc, status} ->
+        append_dedup(acc, event, status)
+      end)
+
+    %{
+      raw: events,
+      dedup: dedup,
+      last_status: last_status
+    }
+  end
+
   defp ensure_sse_table do
     case :ets.whereis(sse_table()) do
       :undefined ->
@@ -385,16 +449,13 @@ defmodule Aquila.Transport.Cassette do
     key = {cassette, request_id}
 
     case :ets.lookup(table, key) do
-      [{^key, events}] when is_list(events) ->
+      [{^key, %{raw: events}}] when is_list(events) ->
         true
 
       [] ->
         case ensure_sse_loaded(cassette, path) do
           :ok ->
-            case :ets.lookup(table, key) do
-              [{^key, events}] when is_list(events) -> true
-              _ -> false
-            end
+            match?([{^key, %{raw: _}}], :ets.lookup(table, key))
 
           :missing ->
             false

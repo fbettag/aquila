@@ -2,7 +2,6 @@ defmodule Aquila.Transport.Body do
   @moduledoc false
 
   alias Aquila.Transport.Cassette
-  alias StableJason
 
   @context_lines 3
   @max_diff_lines 200
@@ -14,10 +13,20 @@ defmodule Aquila.Transport.Body do
   """
   def normalize(nil), do: nil
 
-  def normalize(body) when is_map(body) or is_list(body) do
-    body
-    |> StableJason.encode!(sorter: :asc)
-    |> Jason.decode!()
+  def normalize(%_{} = struct), do: struct |> Map.from_struct() |> normalize_map()
+
+  def normalize(body) when is_map(body), do: normalize_map(body)
+
+  def normalize(body) when is_list(body) do
+    cond do
+      Keyword.keyword?(body) ->
+        body
+        |> Enum.into(%{})
+        |> normalize_map()
+
+      true ->
+        Enum.map(body, &normalize/1)
+    end
   end
 
   def normalize(body) when is_binary(body) do
@@ -31,6 +40,16 @@ defmodule Aquila.Transport.Body do
   end
 
   def normalize(body), do: body
+
+  defp normalize_map(map) do
+    map
+    |> Enum.map(fn {key, value} -> {normalize_key(key), normalize(value)} end)
+    |> Enum.sort_by(&elem(&1, 0))
+    |> Map.new()
+  end
+
+  defp normalize_key(key) when is_atom(key), do: Atom.to_string(key)
+  defp normalize_key(key), do: key
 
   @doc """
   Returns true when the two bodies are structurally equivalent once
