@@ -81,7 +81,11 @@ defmodule Aquila.Transport.Replay do
   def stream(%{opts: opts} = req, callback) when is_function(callback, 1) do
     with {:ok, cassette} <- fetch_cassette(opts) do
       request_id = Cassette.next_index(cassette, opts)
-      verify_prompt!(req, cassette, request_id, :post)
+      skip_verification? = Keyword.get(opts || [], :skip_verification, false)
+
+      unless skip_verification? do
+        verify_prompt!(req, cassette, request_id, :post)
+      end
 
       with {:ok, events} <- Cassette.fetch_sse_events(cassette, request_id) do
         # Buffer tool calls to synthesize tool_call_end events

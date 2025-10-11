@@ -129,6 +129,7 @@ defmodule Aquila.Transport.Record do
   defp replay_stream(req, _cassette, index, callback) do
     req
     |> put_index(index)
+    |> skip_verification()
     |> Replay.stream(callback)
   end
 
@@ -362,4 +363,10 @@ defmodule Aquila.Transport.Record do
   end
 
   defp put_index(req, index), do: %{req | opts: [cassette_index: index]}
+
+  defp skip_verification(%{opts: opts} = req) when is_list(opts) do
+    %{req | opts: Keyword.put(opts, :skip_verification, true)}
+  end
+
+  defp skip_verification(req), do: Map.put(req, :opts, skip_verification: true)
 end

@@ -74,4 +74,29 @@ defmodule Aquila.TransportCassetteTest do
     # Should not crash when table doesn't exist
     assert :ok = Cassette.reset_index(:all)
   end
+
+  test "append_sse_event normalizes and deduplicates done events" do
+    Cassette.cache_sse_request("cassette_a", 1)
+
+    Cassette.append_sse_event("cassette_a", 1, %{"type" => "done", "status" => :completed})
+    Cassette.append_sse_event("cassette_a", 1, %{"type" => "done", "status" => "completed"})
+
+    assert {:ok, [%{"type" => "done", "status" => "completed"}]} =
+             Cassette.fetch_sse_events("cassette_a", 1)
+  end
+
+  test "append_sse_event accepts encoded JSON lines" do
+    Cassette.cache_sse_request("cassette_b", 1)
+
+    json_line =
+      Jason.encode!(%{
+        "type" => "usage",
+        "usage" => %{"total_tokens" => 42}
+      })
+
+    Cassette.append_sse_event("cassette_b", 1, json_line)
+
+    assert {:ok, [%{"type" => "usage", "usage" => %{"total_tokens" => 42}}]} =
+             Cassette.fetch_sse_events("cassette_b", 1)
+  end
 end
