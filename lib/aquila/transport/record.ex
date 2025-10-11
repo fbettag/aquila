@@ -52,10 +52,9 @@ defmodule Aquila.Transport.Record do
     with {:ok, cassette} <- fetch_cassette(opts) do
       index = Cassette.next_index(cassette, opts)
 
-      if cassette_available?(cassette, index, :sse) do
-        replay_stream(req, cassette, index, callback)
-      else
-        record_stream(req, cassette, index, callback)
+      case resolve_mode(cassette, index, :sse) do
+        {:replay, meta} -> replay_stream(req, cassette, index, callback, meta)
+        :record -> record_stream(req, cassette, index, callback)
       end
     else
       :no_cassette -> inner_transport().stream(strip_recorder_opts(req), callback)
@@ -68,10 +67,9 @@ defmodule Aquila.Transport.Record do
     with {:ok, cassette} <- fetch_cassette(opts) do
       index = Cassette.next_index(cassette, opts)
 
-      if cassette_available?(cassette, index, {:http, method}) do
-        replay_http(method, req, cassette, index)
-      else
-        record_http(method, req, cassette, index)
+      case resolve_mode(cassette, index, {:http, method}) do
+        {:replay, meta} -> replay_http(method, req, cassette, index, meta)
+        :record -> record_http(method, req, cassette, index)
       end
     else
       :no_cassette -> call_inner(method, strip_recorder_opts(req))
@@ -98,8 +96,8 @@ defmodule Aquila.Transport.Record do
     end
   end
 
-  defp replay_http(method, req, cassette, index) do
-    verify_prompt!(req, cassette, index, method)
+  defp replay_http(method, req, cassette, index, meta) do
+    verify_prompt!(req, cassette, index, method, meta)
 
     cassette
     |> Cassette.post_path(index)
@@ -127,21 +125,21 @@ defmodule Aquila.Transport.Record do
     end
   end
 
-  defp replay_stream(req, cassette, index, callback) do
-    verify_prompt!(req, cassette, index, :post)
+  defp replay_stream(req, cassette, index, callback, meta) do
+    verify_prompt!(req, cassette, index, :post, meta)
 
     req
     |> put_index(index)
     |> Replay.stream(callback)
   end
 
-  defp verify_prompt!(req, cassette, index, method) do
+  defp verify_prompt!(req, cassette, index, method, meta_override) do
     clean_req = strip_recorder_opts(req)
     body = Map.get(clean_req, :body)
     # Normalize body before comparing to recorded metadata
     normalized_body = Body.normalize(body)
 
-    case Cassette.read_meta(cassette, index) do
+    case resolve_meta(meta_override, cassette, index) do
       {:ok, meta} ->
         cond do
           !method_matches?(meta, method) ->
@@ -188,15 +186,29 @@ defmodule Aquila.Transport.Record do
     raise RuntimeError, message
   end
 
-  defp cassette_available?(cassette, index, type) do
-    case type do
-      {:http, _method} ->
-        Cassette.exists?(cassette, index, :meta) and Cassette.exists?(cassette, index, :post)
-
-      :sse ->
-        Cassette.exists?(cassette, index, :meta) and Cassette.exists?(cassette, index, :sse)
+  defp resolve_mode(cassette, index, {:http, _method}) do
+    with {:ok, meta} <- Cassette.read_meta(cassette, index),
+         true <- File.exists?(Cassette.post_path(cassette, index)) do
+      {:replay, meta}
+    else
+      {:error, _reason} -> :record
+      false -> :record
     end
   end
+
+  defp resolve_mode(cassette, index, :sse) do
+    with {:ok, meta} <- Cassette.read_meta(cassette, index),
+         true <- Cassette.exists?(cassette, index, :sse) do
+      {:replay, meta}
+    else
+      {:error, _reason} -> :record
+      false -> :record
+    end
+  end
+
+  defp resolve_meta(%{} = meta, _cassette, _index), do: {:ok, meta}
+  defp resolve_meta({:ok, %{} = meta}, _cassette, _index), do: {:ok, meta}
+  defp resolve_meta(_meta_override, cassette, index), do: Cassette.read_meta(cassette, index)
 
   defp persist_meta(cassette, index, req, method \\ :post) do
     meta = %{
