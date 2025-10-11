@@ -246,7 +246,7 @@ defmodule Aquila.TransportReplayTest do
 
     req = %{
       body: Jason.encode!(%{"messages" => []}),
-      opts: [cassette: cassette, cassette_index: request_id]
+      opts: [cassette: cassette, cassette_index: request_id, verify_prompt: true]
     }
 
     assert_raise RuntimeError, ~r/Cassette prompt mismatch/, fn ->
@@ -266,7 +266,11 @@ defmodule Aquila.TransportReplayTest do
     Cassette.post_path(cassette, request_id)
     |> File.write!(Jason.encode!(%{"ok" => true}))
 
-    req = %{body: nil, opts: [cassette: cassette, cassette_index: request_id]}
+    req =
+      %{
+        body: nil,
+        opts: [cassette: cassette, cassette_index: request_id, verify_prompt: true]
+      }
 
     assert_raise RuntimeError, ~r/Cassette method mismatch/, fn ->
       Replay.get(req)
@@ -285,7 +289,11 @@ defmodule Aquila.TransportReplayTest do
     Cassette.post_path(cassette, request_id)
     |> File.write!(Jason.encode!(%{"ok" => true}))
 
-    req = %{body: nil, opts: [cassette: cassette, cassette_index: request_id]}
+    req =
+      %{
+        body: nil,
+        opts: [cassette: cassette, cassette_index: request_id, verify_prompt: true]
+      }
 
     assert_raise RuntimeError, ~r/Cassette method mismatch/, fn ->
       Replay.delete(req)
@@ -305,7 +313,7 @@ defmodule Aquila.TransportReplayTest do
 
     req = %{
       body: Jason.encode!(%{"messages" => []}),
-      opts: [cassette: cassette, cassette_index: request_id]
+      opts: [cassette: cassette, cassette_index: request_id, verify_prompt: true]
     }
 
     assert_raise RuntimeError, ~r/Cassette metadata missing/, fn ->

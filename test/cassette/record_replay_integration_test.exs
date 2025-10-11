@@ -139,13 +139,21 @@ defmodule Aquila.TransportRecordReplayTest do
     assert {:ok, %{"ok" => true}} = Replay.post(req)
 
     get_req = Map.put(req, :body, nil)
+
+    get_req =
+      get_req
+      |> Map.update!(:opts, fn opts -> Keyword.put(opts, :verify_prompt, true) end)
+
     assert_raise RuntimeError, ~r/Cassette method mismatch/, fn -> Replay.get(get_req) end
   end
 
   test "replay stream rejects prompt mismatches", %{tmp_dir: _tmp} do
     cassette = "replay/mismatch"
     index = 1
-    req = base_req(cassette: cassette, cassette_index: index)
+
+    req =
+      base_req(cassette: cassette, cassette_index: index)
+      |> Map.update!(:opts, fn opts -> Keyword.put(opts, :verify_prompt, true) end)
 
     meta = %{"body" => %{"prompt" => "different"}}
     Cassette.write_meta(cassette, index, meta)

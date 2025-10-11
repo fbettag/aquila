@@ -80,10 +80,10 @@ defmodule Aquila.Transport.Replay do
   @impl true
   def stream(%{opts: opts} = req, callback) when is_function(callback, 1) do
     with {:ok, cassette} <- fetch_cassette(opts) do
-      request_id = Cassette.next_index(cassette, opts)
-      skip_verification? = Keyword.get(opts || [], :skip_verification, false)
+      opts_list = opts || []
+      request_id = Cassette.next_index(cassette, opts_list)
 
-      unless skip_verification? do
+      if should_verify?(opts_list) do
         verify_prompt!(req, cassette, request_id, :post)
       end
 
@@ -189,10 +189,14 @@ defmodule Aquila.Transport.Replay do
 
   defp handle_http(method, req) do
     opts = Map.get(req, :opts, [])
+    opts_list = opts || []
 
     with {:ok, cassette} <- fetch_cassette(opts) do
-      index = Cassette.next_index(cassette, opts)
-      verify_prompt!(req, cassette, index, method)
+      index = Cassette.next_index(cassette, opts_list)
+
+      if should_verify?(opts_list) do
+        verify_prompt!(req, cassette, index, method)
+      end
 
       cassette
       |> Cassette.post_path(index)
@@ -291,6 +295,12 @@ defmodule Aquila.Transport.Replay do
       value -> {:ok, value}
     end
   end
+
+  defp should_verify?(opts) when is_list(opts) do
+    Keyword.get(opts, :verify_prompt, false) and not Keyword.get(opts, :skip_verification, false)
+  end
+
+  defp should_verify?(_), do: false
 
   defp to_event(%{"type" => "delta", "content" => content}) do
     %{type: :delta, content: content}
