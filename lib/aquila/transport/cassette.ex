@@ -6,6 +6,260 @@ defmodule Aquila.Transport.Cassette do
   @type cassette :: String.t()
   @type index :: pos_integer()
 
+  defp meta_table, do: :aquila_cassette_meta
+  defp sse_table, do: :aquila_cassette_sse
+
+  defp ensure_meta_table do
+    case :ets.whereis(meta_table()) do
+      :undefined ->
+        :ets.new(meta_table(), [:set, :public, :named_table, {:read_concurrency, true}])
+
+      _ref ->
+        meta_table()
+    end
+  end
+
+  defp ensure_meta_loaded(cassette, path) do
+    table = ensure_meta_table()
+
+    case :ets.lookup(table, {:loaded, cassette}) do
+      [{_, {:ok, {cached_mtime, cached_size}}}] ->
+        case File.stat(path) do
+          {:ok, %File.Stat{mtime: ^cached_mtime, size: ^cached_size}} ->
+            :ok
+
+          {:ok, _stat} ->
+            load_meta_cache(cassette, path)
+
+          {:error, reason} ->
+            reset_meta_cache(cassette)
+            {:error, {:meta_missing, path, reason}}
+        end
+
+      [{_, :missing}] ->
+        case File.stat(path) do
+          {:ok, _stat} -> load_meta_cache(cassette, path)
+          {:error, _reason} -> :missing
+        end
+
+      [] ->
+        load_meta_cache(cassette, path)
+    end
+  end
+
+  defp load_meta_cache(cassette, path) do
+    reset_meta_cache(cassette)
+
+    if File.exists?(path) do
+      table = ensure_meta_table()
+
+      result =
+        path
+        |> File.stream!([], :line)
+        |> Enum.reduce_while(:ok, fn line, acc ->
+          trimmed = String.trim(line)
+
+          if trimmed == "" do
+            {:cont, acc}
+          else
+            case Jason.decode(trimmed) do
+              {:ok, %{"request_id" => request_id} = meta} ->
+                :ets.insert(table, {{cassette, request_id}, meta})
+                {:cont, acc}
+
+              {:error, reason} ->
+                {:halt, {:error, {:meta_decode_failed, path, reason}}}
+
+              _ ->
+                {:cont, acc}
+            end
+          end
+        end)
+
+      case result do
+        :ok ->
+          case File.stat(path) do
+            {:ok, %File.Stat{mtime: mtime, size: size}} ->
+              :ets.insert(table, {{:loaded, cassette}, {:ok, {mtime, size}}})
+              :ok
+
+            {:error, reason} ->
+              {:error, {:meta_missing, path, reason}}
+          end
+
+        {:error, _reason} = error ->
+          error
+      end
+    else
+      table = ensure_meta_table()
+      :ets.insert(table, {{:loaded, cassette}, :missing})
+      :missing
+    end
+  end
+
+  defp cache_meta_entry(cassette, request_id, meta) do
+    table = ensure_meta_table()
+    normalized = stringify_top_level_keys(meta)
+    :ets.insert(table, {{cassette, request_id}, normalized})
+
+    case File.stat(meta_path(cassette)) do
+      {:ok, %File.Stat{mtime: mtime, size: size}} ->
+        :ets.insert(table, {{:loaded, cassette}, {:ok, {mtime, size}}})
+
+      {:error, _reason} ->
+        :ets.delete(table, {:loaded, cassette})
+    end
+
+    :ok
+  end
+
+  defp ensure_sse_loaded(cassette, path) do
+    table = ensure_sse_table()
+
+    case :ets.lookup(table, {:loaded, cassette}) do
+      [{_, {:ok, {cached_mtime, cached_size}}}] ->
+        case File.stat(path) do
+          {:ok, %File.Stat{mtime: ^cached_mtime, size: ^cached_size}} ->
+            :ok
+
+          {:ok, _stat} ->
+            load_sse_cache(cassette, path)
+
+          {:error, reason} ->
+            reset_sse_cache(cassette)
+            {:error, {:sse_missing, path, reason}}
+        end
+
+      [{_, :missing}] ->
+        case File.stat(path) do
+          {:ok, _stat} -> load_sse_cache(cassette, path)
+          {:error, _reason} -> :missing
+        end
+
+      [] ->
+        load_sse_cache(cassette, path)
+    end
+  end
+
+  defp load_sse_cache(cassette, path) do
+    reset_sse_cache(cassette)
+    table = ensure_sse_table()
+
+    if File.exists?(path) do
+      result =
+        path
+        |> File.stream!([], :line)
+        |> Enum.reduce_while(:ok, fn line, acc ->
+          trimmed = String.trim(line)
+
+          if trimmed == "" do
+            {:cont, acc}
+          else
+            case Jason.decode(trimmed) do
+              {:ok, %{"request_id" => request_id}} ->
+                :ets.insert(table, {{cassette, request_id}, true})
+                {:cont, acc}
+
+              {:error, reason} ->
+                {:halt, {:error, {:sse_decode_failed, path, reason}}}
+
+              _ ->
+                {:cont, acc}
+            end
+          end
+        end)
+
+      case result do
+        :ok ->
+          case File.stat(path) do
+            {:ok, %File.Stat{mtime: mtime, size: size}} ->
+              :ets.insert(table, {{:loaded, cassette}, {:ok, {mtime, size}}})
+              :ok
+
+            {:error, reason} ->
+              {:error, {:sse_missing, path, reason}}
+          end
+
+        {:error, _reason} = error ->
+          error
+      end
+    else
+      :ets.insert(table, {{:loaded, cassette}, :missing})
+      :missing
+    end
+  end
+
+  @doc false
+  @spec cache_sse_request(cassette(), index()) :: :ok
+  def cache_sse_request(cassette, request_id) do
+    table = ensure_sse_table()
+    :ets.insert(table, {{cassette, request_id}, true})
+
+    case File.stat(sse_path(cassette)) do
+      {:ok, %File.Stat{mtime: mtime, size: size}} ->
+        :ets.insert(table, {{:loaded, cassette}, {:ok, {mtime, size}}})
+
+      {:error, _reason} ->
+        :ets.delete(table, {:loaded, cassette})
+    end
+
+    :ok
+  end
+
+  defp reset_meta_cache(:all) do
+    case :ets.whereis(meta_table()) do
+      :undefined -> :ok
+      table -> :ets.delete_all_objects(table)
+    end
+  end
+
+  defp reset_meta_cache(cassette) do
+    case :ets.whereis(meta_table()) do
+      :undefined ->
+        :ok
+
+      table ->
+        :ets.match_delete(table, {{cassette, :_}, :_})
+        :ets.delete(table, {:loaded, cassette})
+        :ok
+    end
+  end
+
+  defp reset_sse_cache(:all) do
+    case :ets.whereis(sse_table()) do
+      :undefined -> :ok
+      table -> :ets.delete_all_objects(table)
+    end
+  end
+
+  defp reset_sse_cache(cassette) do
+    case :ets.whereis(sse_table()) do
+      :undefined ->
+        :ok
+
+      table ->
+        :ets.match_delete(table, {{cassette, :_}, :_})
+        :ets.delete(table, {:loaded, cassette})
+        :ok
+    end
+  end
+
+  defp stringify_top_level_keys(map) when is_map(map) do
+    map
+    |> Enum.map(fn {key, value} -> {canonical_key(key), value} end)
+    |> Enum.into(%{})
+  end
+
+  defp ensure_sse_table do
+    case :ets.whereis(sse_table()) do
+      :undefined ->
+        :ets.new(sse_table(), [:set, :public, :named_table, {:read_concurrency, true}])
+
+      _ref ->
+        sse_table()
+    end
+  end
+
   @spec base_path() :: String.t()
   def base_path do
     Application.get_env(:aquila, :recorder, [])
@@ -30,27 +284,37 @@ defmodule Aquila.Transport.Cassette do
         :post -> post_path(cassette, index)
       end
 
-    if what in [:meta, :sse] do
-      File.exists?(path) and has_request_id?(path, index)
-    else
-      File.exists?(path)
+    case what do
+      :meta ->
+        File.exists?(path) and match?({:ok, _}, read_meta(cassette, index))
+
+      :sse ->
+        sse_exists?(cassette, index, path)
+
+      :post ->
+        File.exists?(path)
     end
   end
 
-  defp has_request_id?(path, request_id) do
-    case File.read(path) do
-      {:ok, content} ->
-        content
-        |> String.split("\n", trim: true)
-        |> Enum.any?(fn line ->
-          case Jason.decode(line) do
-            {:ok, %{"request_id" => ^request_id}} -> true
-            _ -> false
-          end
-        end)
+  defp sse_exists?(cassette, request_id, path) do
+    table = ensure_sse_table()
+    key = {cassette, request_id}
 
-      {:error, _} ->
-        false
+    case :ets.lookup(table, key) do
+      [{^key, true}] ->
+        true
+
+      [] ->
+        case ensure_sse_loaded(cassette, path) do
+          :ok ->
+            match?([{^key, true}], :ets.lookup(table, key))
+
+          :missing ->
+            false
+
+          {:error, _reason} ->
+            false
+        end
     end
   end
 
@@ -95,6 +359,9 @@ defmodule Aquila.Transport.Cassette do
       _ref -> :ets.delete_all_objects(:aquila_cassette_indices)
     end
 
+    reset_meta_cache(:all)
+    reset_sse_cache(:all)
+
     :ok
   end
 
@@ -103,6 +370,9 @@ defmodule Aquila.Transport.Cassette do
       :undefined -> :ok
       _ref -> :ets.delete(:aquila_cassette_indices, cassette)
     end
+
+    reset_meta_cache(cassette)
+    reset_sse_cache(cassette)
 
     :ok
   end
@@ -116,28 +386,31 @@ defmodule Aquila.Transport.Cassette do
     line = StableJason.encode!(meta_with_id, sorter: :asc) <> "\n"
 
     File.write!(path, line, [:append])
+    cache_meta_entry(cassette, request_id, meta_with_id)
   end
 
   @spec read_meta(cassette(), index()) :: {:ok, map()} | {:error, term()}
   def read_meta(cassette, request_id) do
+    table = ensure_meta_table()
+    key = {cassette, request_id}
+
     path = meta_path(cassette)
 
-    case File.read(path) do
-      {:ok, content} ->
-        result =
-          content
-          |> String.split("\n", trim: true)
-          |> Enum.find_value(fn line ->
-            case Jason.decode(line) do
-              {:ok, %{"request_id" => ^request_id} = meta} -> {:ok, meta}
-              _ -> nil
-            end
-          end)
+    case ensure_meta_loaded(cassette, path) do
+      :ok ->
+        case :ets.lookup(table, key) do
+          [{^key, meta}] ->
+            {:ok, meta}
 
-        result || {:error, {:meta_missing, path, :not_found}}
+          [] ->
+            {:error, {:meta_missing, path, :not_found}}
+        end
+
+      :missing ->
+        {:error, {:meta_missing, path, :not_found}}
 
       {:error, reason} ->
-        {:error, {:meta_missing, path, reason}}
+        {:error, reason}
     end
   end
 

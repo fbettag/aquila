@@ -108,6 +108,7 @@ defmodule Aquila.Transport.Record do
   defp record_stream(req, cassette, request_id, callback) do
     clean_req = strip_recorder_opts(req)
     persist_meta(cassette, request_id, clean_req)
+    Cassette.cache_sse_request(cassette, request_id)
 
     Cassette.ensure_dir(Cassette.sse_path(cassette))
     {:ok, io} = File.open(Cassette.sse_path(cassette), [:append, :utf8])
