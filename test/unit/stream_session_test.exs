@@ -3,6 +3,7 @@ defmodule Aquila.StreamSessionTest do
 
   alias Aquila.StreamSession
   import ExUnit.CaptureLog
+  require Logger
 
   defmodule Transport do
     @behaviour Aquila.Transport
@@ -229,30 +230,39 @@ defmodule Aquila.StreamSessionTest do
   end
 
   test "propagates transport errors to pubsub and persistence", %{supervisor: supervisor} do
+    original_console = Application.get_env(:logger, :console, [])
+    original_otp = Keyword.get(original_console, :handle_otp_reports, true)
+
     capture_log(fn ->
-      Transport.configure({:events, [[%{type: :error, error: %{message: "boom"}}]]})
+      Logger.configure_backend(:console, handle_otp_reports: false)
 
-      assistant = Aquila.Assistant.new(model: "gpt-4o-mini")
+      try do
+        Transport.configure({:events, [[%{type: :error, error: %{message: "boom"}}]]})
 
-      Phoenix.PubSub.subscribe(__MODULE__.PubSub, "aquila:session:session-err")
+        assistant = Aquila.Assistant.new(model: "gpt-4o-mini")
 
-      {:ok, pid} =
-        StreamSession.start(
-          supervisor: supervisor,
-          pubsub: __MODULE__.PubSub,
-          session_id: "session-err",
-          assistant: assistant,
-          content: "Oops",
-          persistence: Persistence,
-          timeout: 2_000
-        )
+        Phoenix.PubSub.subscribe(__MODULE__.PubSub, "aquila:session:session-err")
 
-      monitor = Process.monitor(pid)
+        {:ok, pid} =
+          StreamSession.start(
+            supervisor: supervisor,
+            pubsub: __MODULE__.PubSub,
+            session_id: "session-err",
+            assistant: assistant,
+            content: "Oops",
+            persistence: Persistence,
+            timeout: 2_000
+          )
 
-      assert_receive {:persist_start, "session-err", "Oops"}
-      assert_receive {:persist_error, "session-err", %{message: "boom"}, %{chunks: []}}
-      assert_receive {:aquila_stream_error, "session-err", %{message: "boom"}}
-      assert_receive {:DOWN, ^monitor, :process, ^pid, _reason}
+        monitor = Process.monitor(pid)
+
+        assert_receive {:persist_start, "session-err", "Oops"}
+        assert_receive {:persist_error, "session-err", %{message: "boom"}, %{chunks: []}}
+        assert_receive {:aquila_stream_error, "session-err", %{message: "boom"}}
+        assert_receive {:DOWN, ^monitor, :process, ^pid, _reason}
+      after
+        Logger.configure_backend(:console, handle_otp_reports: original_otp)
+      end
     end)
   end
 

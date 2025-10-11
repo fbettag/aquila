@@ -137,7 +137,19 @@ defmodule Aquila.Transport.Record do
     clean_req = strip_recorder_opts(req)
     body = Map.get(clean_req, :body)
     # Normalize body before comparing to recorded metadata
-    normalized_body = Body.normalize(body)
+    # Cache the normalized body so repeated verify calls avoid recomputing
+    cache_key = {:aquila_normalized_body, :erlang.phash2(body)}
+
+    normalized_body =
+      case Process.get(cache_key) do
+        nil ->
+          normalized = Body.normalize(body)
+          Process.put(cache_key, normalized)
+          normalized
+
+        cached ->
+          cached
+      end
 
     case resolve_meta(meta_override, cassette, index) do
       {:ok, meta} ->
@@ -263,7 +275,21 @@ defmodule Aquila.Transport.Record do
   defp bodies_match?(meta, normalized_body) do
     case Map.fetch(meta, "body") do
       {:ok, recorded_body} ->
-        Body.equivalent?(recorded_body, normalized_body)
+        recorded_normalized = Body.normalize(recorded_body)
+
+        recorded_hash = :erlang.phash2(recorded_normalized)
+        current_hash = :erlang.phash2(normalized_body)
+
+        cond do
+          recorded_hash != current_hash ->
+            false
+
+          recorded_normalized == normalized_body ->
+            true
+
+          true ->
+            Body.equivalent?(recorded_normalized, normalized_body)
+        end
 
       :error ->
         true

@@ -17,7 +17,7 @@ defmodule Aquila.TransportBodyTest do
   end
 
   test "normalize handles keyword lists and plain lists" do
-    assert Body.normalize([foo: 1, bar: [baz: 2]]) == %{
+    assert Body.normalize(foo: 1, bar: [baz: 2]) == %{
              "bar" => %{"baz" => 2},
              "foo" => 1
            }
