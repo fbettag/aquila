@@ -101,15 +101,20 @@ defmodule Aquila.StreamSession do
     messages = (assistant.messages || []) ++ [%{role: :user, content: content}]
 
     # Start streaming
-    {:ok, ref} =
-      Aquila.stream(messages,
-        instructions: assistant.instructions,
-        tools: assistant.tools || [],
-        model: assistant.model,
-        temperature: assistant.temperature,
-        tool_context: assistant.context,
-        timeout: timeout
+    stream_opts =
+      maybe_put_reasoning_opt(
+        [
+          instructions: assistant.instructions,
+          tools: assistant.tools || [],
+          model: assistant.model,
+          temperature: assistant.temperature,
+          tool_context: assistant.context,
+          timeout: timeout
+        ],
+        assistant.reasoning
       )
+
+    {:ok, ref} = Aquila.stream(messages, stream_opts)
 
     # Process stream events
     Logger.info("Stream session started", session_id: session_id)
@@ -144,6 +149,9 @@ defmodule Aquila.StreamSession do
         %{}
     end
   end
+
+  defp maybe_put_reasoning_opt(opts, nil), do: opts
+  defp maybe_put_reasoning_opt(opts, reasoning), do: Keyword.put(opts, :reasoning, reasoning)
 
   defp handle_stream_events(
          ref,

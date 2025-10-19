@@ -8,13 +8,14 @@ defmodule Aquila.Message do
   """
 
   @enforce_keys [:role, :content]
-  defstruct [:role, :content, :name]
+  defstruct [:role, :content, :name, :tool_call_id]
 
-  @type role :: :system | :user | :assistant | :function
+  @type role :: :system | :user | :assistant | :function | :tool
   @type t :: %__MODULE__{
           role: role(),
           content: iodata() | map(),
-          name: nil | String.t()
+          name: nil | String.t(),
+          tool_call_id: nil | String.t()
         }
 
   @doc """
@@ -23,10 +24,17 @@ defmodule Aquila.Message do
   ## Options
 
   * `:name` – assistant/function name associated with the message.
+  * `:tool_call_id` – tool call ID for tool role messages (required for newer models like GPT-5).
   """
   @spec new(role(), iodata() | map(), keyword()) :: t()
-  def new(role, content, opts \\ []) when role in [:system, :user, :assistant, :function] do
-    struct!(__MODULE__, role: role, content: content, name: Keyword.get(opts, :name))
+  def new(role, content, opts \\ [])
+      when role in [:system, :user, :assistant, :function, :tool] do
+    struct!(__MODULE__,
+      role: role,
+      content: content,
+      name: Keyword.get(opts, :name),
+      tool_call_id: Keyword.get(opts, :tool_call_id)
+    )
   end
 
   @doc """
@@ -41,13 +49,13 @@ defmodule Aquila.Message do
   @spec coerce(t() | map() | {role(), iodata() | map()}) :: t()
   def coerce(%__MODULE__{} = message), do: message
 
-  def coerce({role, content}) when role in [:system, :user, :assistant, :function] do
+  def coerce({role, content}) when role in [:system, :user, :assistant, :function, :tool] do
     new(role, content)
   end
 
   def coerce(%{role: role, content: content} = map)
-      when role in [:system, :user, :assistant, :function] do
-    new(role, content, name: Map.get(map, :name))
+      when role in [:system, :user, :assistant, :function, :tool] do
+    new(role, content, name: Map.get(map, :name), tool_call_id: Map.get(map, :tool_call_id))
   end
 
   def coerce(%{"role" => role, "content" => content} = map) do
@@ -80,26 +88,49 @@ defmodule Aquila.Message do
   Converts a message into an OpenAI-compatible chat map.
   """
   @spec to_chat_map(t()) :: map()
-  def to_chat_map(%__MODULE__{role: role, content: content, name: name}) do
+  def to_chat_map(%__MODULE__{
+        role: role,
+        content: content,
+        name: name,
+        tool_call_id: tool_call_id
+      }) do
     # Keys are ordered alphabetically to match StableJason sorting
     map = %{content: content, role: Atom.to_string(role)}
 
-    case name do
+    map =
+      case name do
+        nil -> map
+        value -> Map.put(map, :name, value)
+      end
+
+    case tool_call_id do
       nil -> map
-      value -> Map.put(map, :name, value)
+      value -> Map.put(map, :tool_call_id, value)
     end
   end
 
   @doc false
-  @spec function_message(String.t(), iodata()) :: t()
-  def function_message(name, content) do
-    new(:function, IO.iodata_to_binary(content), name: name)
+  @spec function_message(String.t(), iodata(), keyword()) :: t()
+  def function_message(name, content, opts \\ []) do
+    # For backward compatibility, this creates function role messages by default.
+    # Use tool_output_message/3 for the newer tool role format.
+    new(:function, IO.iodata_to_binary(content), Keyword.merge([name: name], opts))
+  end
+
+  @doc false
+  @spec tool_output_message(String.t(), iodata(), keyword()) :: t()
+  def tool_output_message(name, content, opts) do
+    # Creates a tool output message for newer models (GPT-5+).
+    # Requires :tool_call_id option for the tool role.
+    tool_call_id = Keyword.fetch!(opts, :tool_call_id)
+    new(:tool, IO.iodata_to_binary(content), name: name, tool_call_id: tool_call_id)
   end
 
   defp string_role("system"), do: :system
   defp string_role("user"), do: :user
   defp string_role("assistant"), do: :assistant
   defp string_role("function"), do: :function
+  defp string_role("tool"), do: :tool
 
   defp string_role(role) do
     raise ArgumentError, "unknown message role #{inspect(role)}"

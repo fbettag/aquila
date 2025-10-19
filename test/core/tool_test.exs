@@ -247,6 +247,37 @@ defmodule Aquila.ToolTest do
     assert tool.parameters["required"] == ["legacy"]
   end
 
+  test "to_openai does not add nil name field to function tools" do
+    # Regression test: ensure we don't add name: nil when function doesn't have a name
+    tool_map = %{
+      type: "function",
+      function: %{
+        description: "A test function",
+        parameters: %{"type" => "object"}
+      }
+    }
+
+    result = Tool.to_openai(tool_map)
+
+    # Should not add name: nil to the function
+    refute Map.has_key?(result.function, :name), "Should not add :name key with nil value"
+    refute Map.has_key?(result.function, "name"), "Should not add \"name\" key with nil value"
+  end
+
+  test "to_openai preserves existing name field" do
+    tool_map = %{
+      type: "function",
+      function: %{
+        name: "test_func",
+        description: "A test function",
+        parameters: %{"type" => "object"}
+      }
+    }
+
+    result = Tool.to_openai(tool_map)
+    assert result.function[:name] == "test_func"
+  end
+
   test "extracts required from non-map schema" do
     # Edge case: when schema is not a map, extract_required should handle it
     schema = %{

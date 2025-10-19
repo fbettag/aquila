@@ -6,7 +6,6 @@ defmodule Aquila.OpenAITransportLiveTest do
     response =
       aquila_cassette "integration/direct-coverage" do
         Aquila.ask("Reply with the word coverage.",
-          transport: Aquila.Transport.Replay,
           timeout: 60_000
         )
       end

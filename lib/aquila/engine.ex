@@ -15,6 +15,7 @@ defmodule Aquila.Engine do
   alias Aquila.Response
   alias Aquila.Sink
   alias Aquila.Tool
+
   require Logger
 
   defmodule State do
@@ -27,6 +28,7 @@ defmodule Aquila.Engine do
       :model,
       :metadata,
       :instructions,
+      :reasoning,
       :sink,
       :stream?,
       :ref,
@@ -50,7 +52,9 @@ defmodule Aquila.Engine do
       usage: %{},
       round: 0,
       telemetry: %{start_time: nil, meta: %{}},
-      error: nil
+      error: nil,
+      supports_tool_role: nil,
+      last_tool_outputs: []
     ]
   end
 
@@ -76,8 +80,15 @@ defmodule Aquila.Engine do
 
     tools = normalize_tools(Keyword.get(opts, :tools, []))
     model = opts[:model] || config(:default_model) || "gpt-4o-mini"
+    reasoning = normalize_reasoning(opts[:reasoning])
     base_url = opts[:base_url] || config(:base_url) || "https://api.openai.com/v1"
-    endpoint = Endpoint.choose(Keyword.merge(opts, base_url: base_url, model: model))
+
+    endpoint =
+      opts
+      |> Keyword.merge(base_url: base_url, model: model)
+      |> Endpoint.choose()
+      |> select_reasoning_endpoint(reasoning)
+
     sink = Keyword.get(opts, :sink, if(stream?, do: Sink.pid(self()), else: :ignore))
     metadata = normalize_metadata(opts[:metadata])
     timeout = opts[:timeout] || config(:request_timeout) || 30_000
@@ -104,6 +115,7 @@ defmodule Aquila.Engine do
       model: to_string(model),
       metadata: metadata,
       instructions: instructions,
+      reasoning: reasoning,
       sink: sink,
       stream?: stream?,
       ref: ref,
@@ -169,7 +181,15 @@ defmodule Aquila.Engine do
         |> loop()
 
       match?(%{error: error} when not is_nil(error), state) ->
-        raise_error(state, state.error)
+        # Check if this is a role compatibility error that we can retry
+        case detect_role_compatibility_error(state.error, state) do
+          {:retry, new_state} ->
+            Logger.info("Detected role compatibility error, retrying with different format")
+            loop(new_state)
+
+          :no_retry ->
+            raise_error(state, state.error)
+        end
 
       state.status in [:completed, :succeeded, :done] ->
         state
@@ -207,10 +227,23 @@ defmodule Aquila.Engine do
 
   defp handle_event(%State{} = state, %{type: :delta, content: content} = event) do
     chunk = IO.iodata_to_binary(content)
-    maybe_notify_chunk(state, chunk)
-    emit_chunk(state, byte_size(chunk))
 
-    %{state | raw_events: [event | state.raw_events], acc_chunks: [chunk | state.acc_chunks]}
+    # Check if this is a duplicate final delta (contains all accumulated text)
+    # Some APIs send incremental deltas followed by a final complete delta
+    accumulated_text = state.acc_chunks |> Enum.reverse() |> IO.iodata_to_binary()
+
+    should_skip =
+      accumulated_text != "" and chunk == accumulated_text
+
+    if should_skip do
+      # Skip this duplicate final delta
+      Logger.debug("Skipping duplicate final delta")
+      %{state | raw_events: [event | state.raw_events]}
+    else
+      maybe_notify_chunk(state, chunk)
+      emit_chunk(state, byte_size(chunk))
+      %{state | raw_events: [event | state.raw_events], acc_chunks: [chunk | state.acc_chunks]}
+    end
   end
 
   defp handle_event(%State{} = state, %{type: :message, content: content})
@@ -312,14 +345,18 @@ defmodule Aquila.Engine do
   defp execute_tools(%State{} = state) do
     {ready, pending} = Enum.split_with(state.pending_calls, &(&1.status == :ready))
 
-    {payloads, {messages, tool_context}} =
-      Enum.map_reduce(ready, {state.messages, state.tool_context}, fn call, {msgs, ctx} ->
+    {payloads, {messages, tool_context, tool_outputs}} =
+      Enum.map_reduce(ready, {state.messages, state.tool_context, []}, fn call,
+                                                                          {msgs, ctx, outputs} ->
         state_for_call = %{state | tool_context: ctx}
         {payload, new_msgs, new_ctx} = invoke_tool(state_for_call, call, msgs)
-        {payload, {new_msgs, new_ctx}}
+        # Store tool output info for potential retry
+        output_info = %{call_id: call.id, name: call.name, output: payload.output}
+        {payload, {new_msgs, new_ctx, [output_info | outputs]}}
       end)
 
     payloads = Enum.reverse(payloads)
+    tool_outputs = Enum.reverse(tool_outputs)
 
     updated_state =
       case state.endpoint do
@@ -332,7 +369,8 @@ defmodule Aquila.Engine do
       | pending_calls: pending,
         status: :in_progress,
         final_meta: append_tool_meta(state.final_meta, ready),
-        tool_context: tool_context
+        tool_context: tool_context,
+        last_tool_outputs: tool_outputs
     }
   end
 
@@ -395,7 +433,7 @@ defmodule Aquila.Engine do
 
     new_messages =
       case state.endpoint do
-        :chat -> messages ++ [Message.function_message(call.name, output)]
+        :chat -> messages ++ [create_tool_output_message(state, call, output)]
         _ -> messages
       end
 
@@ -546,10 +584,7 @@ defmodule Aquila.Engine do
   end
 
   defp format_changeset_value(value) when is_tuple(value) do
-    value
-    |> Tuple.to_list()
-    |> Enum.map(&format_changeset_value/1)
-    |> Enum.join(" ")
+    value |> Tuple.to_list() |> Enum.map_join(" ", &format_changeset_value/1)
   end
 
   defp format_changeset_value(value), do: inspect(value)
@@ -629,6 +664,7 @@ defmodule Aquila.Engine do
         stream: stream?
       }
       |> maybe_put(:instructions, state.instructions)
+      |> maybe_put(:reasoning, state.reasoning)
       |> maybe_put(:store, state.store)
     else
       %{
@@ -640,6 +676,7 @@ defmodule Aquila.Engine do
       }
       |> maybe_put(:instructions, state.instructions)
       |> maybe_put(:previous_response_id, state.previous_response_id)
+      |> maybe_put(:reasoning, state.reasoning)
       |> maybe_put(:store, state.store)
     end
   end
@@ -765,6 +802,18 @@ defmodule Aquila.Engine do
   defp normalize_metadata(map) when is_map(map), do: map
   defp normalize_metadata(list) when is_list(list), do: Map.new(list)
   defp normalize_metadata(_), do: %{}
+
+  defp normalize_reasoning(nil), do: nil
+  defp normalize_reasoning(reasoning) when is_map(reasoning), do: reasoning
+
+  defp normalize_reasoning(reasoning) when is_binary(reasoning) do
+    %{effort: String.downcase(reasoning)}
+  end
+
+  defp normalize_reasoning(_), do: nil
+
+  defp select_reasoning_endpoint(_endpoint, reasoning) when not is_nil(reasoning), do: :responses
+  defp select_reasoning_endpoint(endpoint, _), do: endpoint
 
   defp resolve_api_key({:system, var}) when is_binary(var), do: System.get_env(var)
   defp resolve_api_key(key) when is_binary(key), do: key
@@ -1045,4 +1094,101 @@ defmodule Aquila.Engine do
 
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  # Creates a tool output message, using the appropriate role based on model capabilities.
+  # Tries tool role first (newer format), falls back to function role if needed.
+  defp create_tool_output_message(state, call, output) do
+    # Determine which role to use based on detection state
+    use_tool_role = should_use_tool_role?(state)
+
+    if use_tool_role do
+      # Use newer tool role format with tool_call_id (for GPT-5+)
+      Message.tool_output_message(call.name, output, tool_call_id: call.id)
+    else
+      # Use legacy function role format (for older models)
+      Message.function_message(call.name, output)
+    end
+  end
+
+  # Determines whether to use the 'tool' role based on detection state.
+  # Returns true if we should try tool role, false for function role.
+  # Unknown: try function first (more compatible with older models)
+  defp should_use_tool_role?(%State{supports_tool_role: nil}), do: false
+  # Known to work
+  defp should_use_tool_role?(%State{supports_tool_role: true}), do: true
+  # Known to fail
+  defp should_use_tool_role?(%State{supports_tool_role: false}), do: false
+
+  # Detects if an error is due to role compatibility and determines if we should retry.
+  # Returns {:retry, new_state} if we should retry with a different role format,
+  # or :no_retry if this is a different error or we've already tried both formats.
+  defp detect_role_compatibility_error(error, %State{endpoint: :chat} = state) do
+    error_message = extract_error_message(error)
+
+    cond do
+      # Error indicates 'tool' role is not supported and we haven't tried function role yet
+      role_not_supported?(error_message, "tool") and state.supports_tool_role != false ->
+        Logger.debug("Model does not support 'tool' role, switching to 'function' role")
+        new_state = rebuild_messages_with_different_role(state, false)
+        {:retry, new_state}
+
+      # Error indicates 'function' role is not supported and we haven't tried tool role yet
+      role_not_supported?(error_message, "function") and state.supports_tool_role != true ->
+        Logger.debug("Model does not support 'function' role, switching to 'tool' role")
+        new_state = rebuild_messages_with_different_role(state, true)
+        {:retry, new_state}
+
+      # Either not a role error, or we've already tried both formats
+      true ->
+        :no_retry
+    end
+  end
+
+  defp detect_role_compatibility_error(_error, _state), do: :no_retry
+
+  # Extracts error message string from various error formats
+  defp extract_error_message({:http_error, _code, body}) when is_binary(body) do
+    case Jason.decode(body) do
+      {:ok, %{"error" => %{"message" => msg}}} -> msg
+      _ -> body
+    end
+  end
+
+  defp extract_error_message(%{message: msg}) when is_binary(msg), do: msg
+  defp extract_error_message(error) when is_binary(error), do: error
+  defp extract_error_message(_), do: ""
+
+  # Checks if error message indicates a specific role is not supported
+  defp role_not_supported?(message, role) do
+    (String.contains?(message, "'#{role}'") and
+       String.contains?(message, "does not support")) or
+      String.contains?(message, "Unsupported value")
+  end
+
+  # Rebuilds messages with a different tool role format after detecting incompatibility.
+  # This removes tool output messages and recreates them with the specified role format.
+  defp rebuild_messages_with_different_role(%State{} = state, use_tool_role) do
+    # Update the state to remember which format to use
+    updated_state = %{state | supports_tool_role: use_tool_role, error: nil}
+
+    # Remove tool output messages (function or tool role) that were added in the last round
+    cleaned_messages =
+      Enum.reject(updated_state.messages, fn msg ->
+        msg.role in [:function, :tool]
+      end)
+
+    # Recreate tool output messages with the new format using stored outputs
+    new_tool_messages =
+      Enum.map(updated_state.last_tool_outputs, fn %{call_id: call_id, name: name, output: output} ->
+        if use_tool_role do
+          Message.tool_output_message(name, output, tool_call_id: call_id)
+        else
+          Message.function_message(name, output)
+        end
+      end)
+
+    rebuilt_messages = cleaned_messages ++ new_tool_messages
+
+    %{updated_state | messages: rebuilt_messages}
+  end
 end

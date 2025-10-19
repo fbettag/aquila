@@ -207,4 +207,115 @@ defmodule Aquila.SinkTest do
       refute_receive _
     end
   end
+
+  describe "end-to-end sink behavior with actual streaming" do
+    defmodule TestTransport do
+      @behaviour Aquila.Transport
+
+      def post(_req), do: {:ok, %{}}
+      def get(_req), do: {:ok, %{}}
+      def delete(_req), do: {:ok, %{}}
+
+      def stream(_req, callback) do
+        # Simulate a realistic streaming sequence
+        callback.(%{type: :delta, content: "Hello"})
+        callback.(%{type: :delta, content: " "})
+        callback.(%{type: :delta, content: "world"})
+
+        callback.(%{
+          type: :done,
+          status: :completed,
+          meta: %{model: "test", usage: %{total_tokens: 10}}
+        })
+
+        {:ok, make_ref()}
+      end
+    end
+
+    test "collector sink accumulates all events during actual stream" do
+      sink = Sink.collector(self())
+
+      {:ok, ref} =
+        Aquila.stream(
+          [%{role: :user, content: "test"}],
+          sink: sink,
+          transport: TestTransport,
+          api_key: "test"
+        )
+
+      # Collect all chunks
+      chunks =
+        Stream.repeatedly(fn ->
+          receive do
+            {:aquila_chunk, chunk, ^ref} -> {:chunk, chunk}
+            {:aquila_done, text, meta, ^ref} -> {:done, text, meta}
+          after
+            100 -> nil
+          end
+        end)
+        |> Enum.take_while(&(&1 != nil))
+        |> Enum.to_list()
+
+      # Verify we received chunks in correct order
+      assert length(chunks) > 0
+
+      chunk_texts = for {:chunk, text} <- chunks, do: text
+      assert chunk_texts == ["Hello", " ", "world"]
+
+      # Verify done message was received with metadata
+      assert Enum.any?(chunks, fn
+               {:done, "Hello world", meta} ->
+                 is_binary(meta[:model]) and meta[:status] == :completed
+
+               _ ->
+                 false
+             end)
+    end
+
+    test "transform function works end-to-end during streaming" do
+      transform = fn
+        {:aquila_chunk, chunk, ref} ->
+          {:custom_chunk, String.upcase(chunk), ref}
+
+        other ->
+          other
+      end
+
+      sink = Sink.collector(self(), transform: transform)
+
+      {:ok, ref} =
+        Aquila.stream(
+          [%{role: :user, content: "test"}],
+          sink: sink,
+          transport: TestTransport,
+          api_key: "test"
+        )
+
+      # Verify transformed chunks are received
+      assert_receive {:custom_chunk, "HELLO", ^ref}
+      assert_receive {:custom_chunk, " ", ^ref}
+      assert_receive {:custom_chunk, "WORLD", ^ref}
+      assert_receive {:aquila_done, "Hello world", _meta, ^ref}
+    end
+
+    test "multiple sinks can receive same stream events" do
+      # Set up two different sinks
+      sink1_pid = self()
+
+      sink2_fun = fn event, ref ->
+        send(sink1_pid, {:sink2_event, event, ref})
+      end
+
+      # Note: This test demonstrates sink behavior conceptually
+      # In practice, Aquila uses one sink per stream, but we can show
+      # that different sink types work correctly with the same event pattern
+      ref = make_ref()
+
+      Sink.notify({:pid, self(), []}, {:chunk, "test"}, ref)
+      Sink.notify({:fun, sink2_fun}, {:chunk, "test"}, ref)
+
+      assert_receive {:aquila_chunk, "test", ^ref}
+      assert_receive {:sink2_event, {:chunk, "test"}, ^ref}
+    end
+  end
 end

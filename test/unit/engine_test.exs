@@ -17,7 +17,73 @@ defmodule Aquila.EngineTest do
   use ExUnit.Case, async: false
 
   alias Aquila.Engine
+  alias Aquila.Message
   alias Aquila.Tool
+
+  defmodule RoleCompatibilityTransport do
+    @behaviour Aquila.Transport
+
+    @impl true
+    def post(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def get(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def delete(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def stream(req, callback) do
+      round = Process.get(:role_compat_test_round, 0)
+      Process.put(:role_compat_test_round, round + 1)
+
+      # Check if the request contains function or tool role messages
+      messages = get_in(req, [:body, :messages]) || []
+      has_function_role = Enum.any?(messages, fn msg -> Map.get(msg, :role) == "function" end)
+
+      cond do
+        # Round 1: Return tool calls
+        round == 0 ->
+          callback.(%{
+            type: :tool_call,
+            id: "calc-1",
+            name: "calculator",
+            args_fragment: "{\"op\":\"add\",\"x\":5,\"y\":3}",
+            call_id: "calc-1"
+          })
+
+          callback.(%{
+            type: :done,
+            status: :requires_action
+          })
+
+          {:ok, make_ref()}
+
+        # Round 2: If function role is used, return compatibility error (GPT-5 doesn't support it)
+        round == 1 and has_function_role ->
+          error_body =
+            Jason.encode!(%{
+              error: %{
+                message:
+                  "litellm.BadRequestError: OpenAIException - Unsupported value: 'messages[2].role' does not support 'function' with this model."
+              }
+            })
+
+          callback.(%{
+            type: :error,
+            error: {:http_error, 400, error_body}
+          })
+
+          {:ok, make_ref()}
+
+        # Round 3: After retry with tool role, return success
+        true ->
+          callback.(%{type: :delta, content: "8"})
+          callback.(%{type: :done, status: :completed})
+          {:ok, make_ref()}
+      end
+    end
+  end
 
   defmodule RoundRobinTransport do
     @behaviour Aquila.Transport
@@ -372,5 +438,73 @@ defmodule Aquila.EngineTest do
 
     assert_receive {:aquila_done, "Recovered", meta, ^ref}, 200
     assert meta[:status] == :completed
+  end
+
+  test "automatically retries with tool role when model doesn't support function role" do
+    setup = fn ->
+      Process.delete(:role_compat_test_round)
+    end
+
+    setup.()
+    on_exit(setup)
+
+    tool =
+      Tool.new(
+        "calculator",
+        [
+          parameters: %{
+            "type" => "object",
+            "properties" => %{
+              "op" => %{"type" => "string"},
+              "x" => %{"type" => "number"},
+              "y" => %{"type" => "number"}
+            }
+          }
+        ],
+        fn %{"op" => "add", "x" => x, "y" => y} -> x + y end
+      )
+
+    # Run with Chat Completions endpoint (where role compatibility matters)
+    response =
+      Engine.run("Calculate 5 + 3",
+        transport: RoleCompatibilityTransport,
+        tools: [tool],
+        endpoint: :chat,
+        base_url: "https://api.openai.com/v1",
+        model: "openai/gpt-5"
+      )
+
+    # Should succeed after automatic retry with tool role
+    assert response.text == "8"
+    assert response.meta[:status] == :completed
+
+    # Verify that 3 rounds occurred: initial call, tool execution with function role (error), retry with tool role
+    assert Process.get(:role_compat_test_round) == 3
+  end
+
+  test "Message module supports both tool and function roles" do
+    # Verify tool role message creation
+    tool_msg = Message.tool_output_message("test_tool", "tool output", tool_call_id: "call-123")
+    assert tool_msg.role == :tool
+    assert tool_msg.tool_call_id == "call-123"
+    assert tool_msg.name == "test_tool"
+    assert tool_msg.content == "tool output"
+
+    # Verify function role message creation (legacy format)
+    func_msg = Message.function_message("test_func", "function output")
+    assert func_msg.role == :function
+    assert func_msg.tool_call_id == nil
+    assert func_msg.name == "test_func"
+    assert func_msg.content == "function output"
+
+    # Verify to_chat_map includes tool_call_id for tool role
+    tool_map = Message.to_chat_map(tool_msg)
+    assert tool_map.role == "tool"
+    assert tool_map.tool_call_id == "call-123"
+
+    # Verify to_chat_map doesn't include tool_call_id for function role
+    func_map = Message.to_chat_map(func_msg)
+    assert func_map.role == "function"
+    refute Map.has_key?(func_map, :tool_call_id)
   end
 end

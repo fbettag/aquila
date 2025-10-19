@@ -36,7 +36,8 @@ defmodule Aquila.Assistant do
     :model,
     :temperature,
     :context,
-    :messages
+    :messages,
+    :reasoning
   ]
 
   @type t :: %__MODULE__{
@@ -45,7 +46,8 @@ defmodule Aquila.Assistant do
           model: String.t() | nil,
           temperature: float() | nil,
           context: term() | nil,
-          messages: [map()] | nil
+          messages: [map()] | nil,
+          reasoning: map() | nil
         }
 
   @doc """
@@ -73,7 +75,8 @@ defmodule Aquila.Assistant do
       model: Keyword.get(opts, :model),
       temperature: Keyword.get(opts, :temperature),
       context: Keyword.get(opts, :context),
-      messages: Keyword.get(opts, :messages)
+      messages: Keyword.get(opts, :messages),
+      reasoning: Keyword.get(opts, :reasoning)
     }
   end
 
@@ -123,6 +126,19 @@ defmodule Aquila.Assistant do
   """
   def with_temperature(%__MODULE__{} = assistant, temperature) when is_float(temperature) do
     %{assistant | temperature: temperature}
+  end
+
+  @doc """
+  Sets the reasoning configuration.
+
+  ## Examples
+
+      assistant
+      |> Aquila.Assistant.with_reasoning(%{effort: "medium"})
+  """
+  def with_reasoning(%__MODULE__{} = assistant, reasoning)
+      when is_map(reasoning) or is_nil(reasoning) do
+    %{assistant | reasoning: reasoning}
   end
 
   @doc """

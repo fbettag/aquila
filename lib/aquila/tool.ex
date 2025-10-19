@@ -98,10 +98,18 @@ defmodule Aquila.Tool do
   def to_openai(%{"type" => type} = map) when is_binary(type), do: map
 
   defp maybe_stringify_function_type(%{type: type, function: function} = map) do
+    # Preserve the name field if it exists (as atom or string key), but don't add nil
     updated_function =
-      function
-      |> Map.update(:name, nil, & &1)
-      |> Map.update("name", nil, & &1)
+      case {Map.get(function, :name), Map.get(function, "name")} do
+        # No name field, keep as-is
+        {nil, nil} -> function
+        # Has atom :name
+        {atom_name, nil} when not is_nil(atom_name) -> function
+        # Has string "name"
+        {nil, string_name} when not is_nil(string_name) -> function
+        # Has both, prefer atom key
+        {_atom_name, _} -> Map.delete(function, "name")
+      end
 
     %{map | type: type, function: updated_function}
   end

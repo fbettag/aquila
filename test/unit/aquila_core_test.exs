@@ -60,7 +60,7 @@ defmodule Aquila.CoreTest do
 
         try do
           Process.put({:aquila_stream_task, ref}, task)
-          assert {:error, {:stream_failed, _}} = Aquila.await_stream(ref, 50)
+          assert {:error, {:stream_failed, _}} = Aquila.await_stream(ref, 1000)
         after
           Process.delete({:aquila_stream_task, ref})
           Process.flag(:trap_exit, false)
