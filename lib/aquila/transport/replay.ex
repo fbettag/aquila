@@ -31,19 +31,25 @@ defmodule Aquila.Transport.Replay do
       args_json = Enum.join(call.fragments, "")
 
       args =
-        case Jason.decode(args_json) do
-          {:ok, decoded} ->
-            decoded
-
-          {:error, error} ->
-            if with_logging do
-              require Logger
-              Logger.error("Failed to decode tool args JSON: #{inspect(error)}")
-              Logger.error("Args JSON was: #{inspect(args_json)}")
-              Logger.error("Fragments were: #{inspect(call.fragments)}")
-            end
-
+        cond do
+          args_json == "" ->
             %{}
+
+          true ->
+            case Jason.decode(args_json) do
+              {:ok, decoded} ->
+                decoded
+
+              {:error, error} ->
+                if with_logging do
+                  require Logger
+                  Logger.warning("Failed to decode tool args JSON: #{inspect(error)}")
+                  Logger.debug("Args JSON was: #{inspect(args_json)}")
+                  Logger.debug("Fragments were: #{inspect(call.fragments)}")
+                end
+
+                %{}
+            end
         end
 
       tool_call_end = %{

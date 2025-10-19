@@ -1,0 +1,23 @@
+{"content":"","request_id":1,"type":"delta"}
+{"args_fragment":"","call_id":"toolu_01JCeqr2iwazgRuuvgSYaojE","id":"toolu_01JCeqr2iwazgRuuvgSYaojE","name":"calculator","request_id":1,"type":"tool_call"}
+{"content":"","request_id":1,"type":"delta"}
+{"args_fragment":"","call_id":"toolu_01JCeqr2iwazgRuuvgSYaojE","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"content":"","request_id":1,"type":"delta"}
+{"args_fragment":"{\"expres","call_id":"toolu_01JCeqr2iwazgRuuvgSYaojE","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"content":"","request_id":1,"type":"delta"}
+{"args_fragment":"sion\": \"","call_id":"toolu_01JCeqr2iwazgRuuvgSYaojE","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"content":"","request_id":1,"type":"delta"}
+{"args_fragment":"2+2\"}","call_id":"toolu_01JCeqr2iwazgRuuvgSYaojE","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args":{"expression":"2+2"},"call_id":"toolu_01JCeqr2iwazgRuuvgSYaojE","id":"toolu_01JCeqr2iwazgRuuvgSYaojE","name":"calculator","request_id":1,"type":"tool_call_end"}
+{"meta":{"id":"chatcmpl-1a1a0445-4e49-4250-8aeb-707f1aa31b37","model":"claude-sonnet-4-5","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
+{"meta":null,"request_id":1,"status":"completed","type":"done"}
+{"content":"According","request_id":2,"type":"delta"}
+{"content":" to the calculator tool, 2+2 = 42","request_id":2,"type":"delta"}
+{"content":".\n\nHowever, I should note that this","request_id":2,"type":"delta"}
+{"content":" result appears to be incorrect - the actual mathematical answer to","request_id":2,"type":"delta"}
+{"content":" 2+2 is 4.","request_id":2,"type":"delta"}
+{"content":" It seems the calculator tool may have returned an unexpected or humorous result (","request_id":2,"type":"delta"}
+{"content":"42 being a reference to \"The Hitchhiker's Guide to the","request_id":2,"type":"delta"}
+{"content":" Galaxy\").","request_id":2,"type":"delta"}
+{"meta":{"id":"chatcmpl-a426b963-7961-412b-8ad4-bec282147669","model":"claude-sonnet-4-5"},"request_id":2,"status":"completed","type":"done"}
+{"meta":null,"request_id":2,"status":"completed","type":"done"}

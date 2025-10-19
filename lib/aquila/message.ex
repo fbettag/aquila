@@ -8,14 +8,15 @@ defmodule Aquila.Message do
   """
 
   @enforce_keys [:role, :content]
-  defstruct [:role, :content, :name, :tool_call_id]
+  defstruct [:role, :content, :name, :tool_call_id, :tool_calls]
 
   @type role :: :system | :user | :assistant | :function | :tool
   @type t :: %__MODULE__{
           role: role(),
           content: iodata() | map(),
           name: nil | String.t(),
-          tool_call_id: nil | String.t()
+          tool_call_id: nil | String.t(),
+          tool_calls: nil | list()
         }
 
   @doc """
@@ -33,7 +34,8 @@ defmodule Aquila.Message do
       role: role,
       content: content,
       name: Keyword.get(opts, :name),
-      tool_call_id: Keyword.get(opts, :tool_call_id)
+      tool_call_id: Keyword.get(opts, :tool_call_id),
+      tool_calls: Keyword.get(opts, :tool_calls)
     )
   end
 
@@ -55,12 +57,21 @@ defmodule Aquila.Message do
 
   def coerce(%{role: role, content: content} = map)
       when role in [:system, :user, :assistant, :function, :tool] do
-    new(role, content, name: Map.get(map, :name), tool_call_id: Map.get(map, :tool_call_id))
+    new(role, content,
+      name: Map.get(map, :name),
+      tool_call_id: Map.get(map, :tool_call_id),
+      tool_calls: Map.get(map, :tool_calls)
+    )
   end
 
   def coerce(%{"role" => role, "content" => content} = map) do
     role_atom = string_role(role)
-    new(role_atom, content, name: Map.get(map, "name"))
+
+    new(role_atom, content,
+      name: Map.get(map, "name"),
+      tool_call_id: Map.get(map, "tool_call_id"),
+      tool_calls: Map.get(map, "tool_calls")
+    )
   end
 
   def coerce(other) do
@@ -92,7 +103,8 @@ defmodule Aquila.Message do
         role: role,
         content: content,
         name: name,
-        tool_call_id: tool_call_id
+        tool_call_id: tool_call_id,
+        tool_calls: tool_calls
       }) do
     # Keys are ordered alphabetically to match StableJason sorting
     map = %{content: content, role: Atom.to_string(role)}
@@ -103,9 +115,15 @@ defmodule Aquila.Message do
         value -> Map.put(map, :name, value)
       end
 
-    case tool_call_id do
+    map =
+      case tool_call_id do
+        nil -> map
+        value -> Map.put(map, :tool_call_id, value)
+      end
+
+    case tool_calls do
       nil -> map
-      value -> Map.put(map, :tool_call_id, value)
+      value -> Map.put(map, :tool_calls, value)
     end
   end
 
@@ -123,7 +141,25 @@ defmodule Aquila.Message do
     # Creates a tool output message for newer models (GPT-5+).
     # Requires :tool_call_id option for the tool role.
     tool_call_id = Keyword.fetch!(opts, :tool_call_id)
-    new(:tool, IO.iodata_to_binary(content), name: name, tool_call_id: tool_call_id)
+    text = IO.iodata_to_binary(content)
+
+    case Keyword.get(opts, :format, :text) do
+      :tool_result ->
+        message_content = [
+          %{
+            "type" => "tool_result",
+            "tool_use_id" => tool_call_id,
+            "content" => [
+              %{"type" => "output_text", "text" => text}
+            ]
+          }
+        ]
+
+        new(:tool, message_content, name: name, tool_call_id: tool_call_id)
+
+      :text ->
+        new(:tool, text, name: name, tool_call_id: tool_call_id)
+    end
   end
 
   defp string_role("system"), do: :system

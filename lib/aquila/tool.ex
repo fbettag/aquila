@@ -78,7 +78,7 @@ defmodule Aquila.Tool do
     function =
       maybe_put(%{name: name, parameters: parameters}, :description, description)
 
-    %{type: "function", function: function}
+    %{type: "function", function: function, name: name}
   end
 
   def to_openai(%{type: type} = map) when is_atom(type) do
@@ -111,7 +111,24 @@ defmodule Aquila.Tool do
         {_atom_name, _} -> Map.delete(function, "name")
       end
 
-    %{map | type: type, function: updated_function}
+    base = %{map | type: type, function: updated_function}
+
+    cond do
+      Map.has_key?(base, :name) ->
+        base
+
+      Map.has_key?(base, "name") ->
+        base
+
+      name = Map.get(updated_function, :name) ->
+        Map.put(base, :name, name)
+
+      name = Map.get(updated_function, "name") ->
+        Map.put(base, "name", name)
+
+      true ->
+        base
+    end
   end
 
   defp maybe_stringify_function_type(map), do: map

@@ -1,0 +1,44 @@
+{"content":"<thinking>\nThe","request_id":1,"type":"delta"}
+{"content":" user has requested to calculate 2+","request_id":1,"type":"delta"}
+{"content":"2 using the calculator tool. Looking","request_id":1,"type":"delta"}
+{"content":" at the parameters for the calculator tool, it","request_id":1,"type":"delta"}
+{"content":" requires an \"expression\" parameter,","request_id":1,"type":"delta"}
+{"content":" which should contain the math expression to","request_id":1,"type":"delta"}
+{"content":" evaluate.\n\nThe user provide","request_id":1,"type":"delta"}
+{"content":"d the specific expression \"2+","request_id":1,"type":"delta"}
+{"content":"2\" in","request_id":1,"type":"delta"}
+{"content":" their request, so","request_id":1,"type":"delta"}
+{"content":" we","request_id":1,"type":"delta"}
+{"content":" have","request_id":1,"type":"delta"}
+{"content":" all","request_id":1,"type":"delta"}
+{"content":" the require","request_id":1,"type":"delta"}
+{"content":"d information","request_id":1,"type":"delta"}
+{"content":" to call","request_id":1,"type":"delta"}
+{"content":" the calculator tool.","request_id":1,"type":"delta"}
+{"content":" No","request_id":1,"type":"delta"}
+{"content":" other","request_id":1,"type":"delta"}
+{"content":" tools are needed.","request_id":1,"type":"delta"}
+{"content":"\n</thinking>","request_id":1,"type":"delta"}
+{"content":"","request_id":1,"type":"delta"}
+{"args_fragment":"","call_id":"toolu_01Tm5CFFWXCN3Z2nYjWSgz6w","id":"toolu_01Tm5CFFWXCN3Z2nYjWSgz6w","name":"calculator","request_id":1,"type":"tool_call"}
+{"content":"","request_id":1,"type":"delta"}
+{"args_fragment":"","call_id":"toolu_01Tm5CFFWXCN3Z2nYjWSgz6w","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"content":"","request_id":1,"type":"delta"}
+{"args_fragment":"{\"expressi","call_id":"toolu_01Tm5CFFWXCN3Z2nYjWSgz6w","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"content":"","request_id":1,"type":"delta"}
+{"args_fragment":"on","call_id":"toolu_01Tm5CFFWXCN3Z2nYjWSgz6w","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"content":"","request_id":1,"type":"delta"}
+{"args_fragment":"\": \"2+2\"}","call_id":"toolu_01Tm5CFFWXCN3Z2nYjWSgz6w","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args":{"expression":"2+2"},"call_id":"toolu_01Tm5CFFWXCN3Z2nYjWSgz6w","id":"toolu_01Tm5CFFWXCN3Z2nYjWSgz6w","name":"calculator","request_id":1,"type":"tool_call_end"}
+{"meta":{"id":"chatcmpl-a40954ed-1920-4992-8e24-8a4e72504484","model":"claude-3-opus-latest","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
+{"meta":null,"request_id":1,"status":"completed","type":"done"}
+{"content":"Therefore","request_id":2,"type":"delta"}
+{"content":", using","request_id":2,"type":"delta"}
+{"content":" the calculator tool,","request_id":2,"type":"delta"}
+{"content":" ","request_id":2,"type":"delta"}
+{"content":"2+","request_id":2,"type":"delta"}
+{"content":"2 equals","request_id":2,"type":"delta"}
+{"content":" 4","request_id":2,"type":"delta"}
+{"content":".","request_id":2,"type":"delta"}
+{"meta":{"id":"chatcmpl-ce38020d-a0fb-4de0-b96e-9a85db3bc648","model":"claude-3-opus-latest"},"request_id":2,"status":"completed","type":"done"}
+{"meta":null,"request_id":2,"status":"completed","type":"done"}

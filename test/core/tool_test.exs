@@ -301,4 +301,23 @@ defmodule Aquila.ToolTest do
     tool = Tool.new("test", [parameters: schema], fn _ -> :ok end)
     assert tool.parameters["properties"] == "string_properties"
   end
+
+  test "to_openai passes through raw tool maps unchanged" do
+    # Users can pass raw maps for provider-specific built-in tools
+    custom_tool = %{type: "custom_type", name: "my_tool"}
+    result = Tool.to_openai(custom_tool)
+
+    assert result[:type] == "custom_type"
+    assert result[:name] == "my_tool"
+  end
+
+  test "to_openai does not add fields to non-function tools" do
+    tool = %{type: "custom_type"}
+    result = Tool.to_openai(tool)
+
+    # Should only have the type field
+    assert result[:type] == "custom_type"
+    refute Map.has_key?(result, :name)
+    refute Map.has_key?(result, "name")
+  end
 end

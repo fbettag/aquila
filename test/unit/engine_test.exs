@@ -85,6 +85,90 @@ defmodule Aquila.EngineTest do
     end
   end
 
+  defmodule SilentTransport do
+    @behaviour Aquila.Transport
+
+    @impl true
+    def post(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def get(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def delete(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def stream(req, callback) do
+      round = Process.get(:silent_round, 0)
+      Process.put(:silent_round, round + 1)
+
+      requests = Process.get(:silent_requests, [])
+      Process.put(:silent_requests, [req | requests])
+
+      callback.(%{type: :done, status: :completed})
+      {:ok, make_ref()}
+    end
+  end
+
+  defmodule ToolFormatCompatibilityTransport do
+    @behaviour Aquila.Transport
+
+    @impl true
+    def post(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def get(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def delete(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def stream(req, callback) do
+      round = Process.get(:tool_format_round, 0)
+      Process.put(:tool_format_round, round + 1)
+
+      requests = Process.get(:tool_format_requests, [])
+      Process.put(:tool_format_requests, [req.body | requests])
+
+      case round do
+        0 ->
+          callback.(%{
+            type: :tool_call,
+            id: "calc-1",
+            name: "calculator",
+            args_fragment: "",
+            call_id: "calc-1"
+          })
+
+          callback.(%{
+            type: :tool_call_end,
+            id: "calc-1",
+            name: "calculator",
+            args: %{"op" => "add", "x" => 5, "y" => 3},
+            call_id: "calc-1"
+          })
+
+          callback.(%{type: :done, status: :requires_action})
+          {:ok, make_ref()}
+
+        1 ->
+          {:error,
+           {:http_error, 400,
+            ~s({"error":{"message":"messages.2.content.1: unexpected `tool_use_id` found in `tool_result` blocks"}})}}
+
+        2 ->
+          {:error,
+           {:http_error, 400,
+            ~s({"error":{"message":"Invalid value: 'tool_result'. Supported values are: 'text', 'image_url', 'input_audio', 'refusal', 'audio', and 'file'."}})}}
+
+        _ ->
+          callback.(%{type: :delta, content: "42"})
+          callback.(%{type: :done, status: :completed})
+          {:ok, make_ref()}
+      end
+    end
+  end
+
   defmodule RoundRobinTransport do
     @behaviour Aquila.Transport
 
@@ -478,8 +562,103 @@ defmodule Aquila.EngineTest do
     assert response.text == "8"
     assert response.meta[:status] == :completed
 
-    # Verify that 3 rounds occurred: initial call, tool execution with function role (error), retry with tool role
-    assert Process.get(:role_compat_test_round) == 3
+    # Verify that 2 rounds occurred: initial call and retry with the supported tool role format
+    assert Process.get(:role_compat_test_round) == 2
+  end
+
+  test "forces tool execution when provider completes without tool calls" do
+    cleanup = fn ->
+      Process.delete(:silent_round)
+      Process.delete(:silent_requests)
+    end
+
+    cleanup.()
+    on_exit(cleanup)
+
+    tool =
+      Tool.new(
+        "calculator",
+        [parameters: %{"type" => "object", "properties" => %{}}],
+        fn _args ->
+          send(self(), :forced_tool_invoked)
+          "42"
+        end
+      )
+
+    response =
+      Engine.run("Please add 2+2", transport: SilentTransport, tools: [tool], endpoint: :chat)
+
+    assert response.meta[:status] == :completed
+    assert_received :forced_tool_invoked
+    assert Process.get(:silent_round) == 2
+  end
+
+  test "retries tool message format when provider flips between tool_result and text" do
+    cleanup = fn ->
+      Process.delete(:tool_format_round)
+      Process.delete(:tool_format_requests)
+    end
+
+    cleanup.()
+    on_exit(cleanup)
+
+    tool =
+      Tool.new(
+        "calculator",
+        [
+          parameters: %{
+            "type" => "object",
+            "properties" => %{
+              "op" => %{"type" => "string"},
+              "x" => %{"type" => "number"},
+              "y" => %{"type" => "number"}
+            }
+          }
+        ],
+        fn args ->
+          send(self(), {:tool_args_seen, args})
+          "42"
+        end
+      )
+
+    response =
+      Engine.run("Calculate 5 + 3",
+        transport: ToolFormatCompatibilityTransport,
+        tools: [tool],
+        endpoint: :chat,
+        model: "openai/gpt-4o"
+      )
+
+    assert response.text == "42"
+    assert response.meta[:status] == :completed
+    assert_receive {:tool_args_seen, %{"op" => "add", "x" => 5, "y" => 3}}
+    assert Process.get(:tool_format_round) == 4
+
+    requests =
+      Process.get(:tool_format_requests, [])
+      |> Enum.reverse()
+      |> Enum.map(& &1.messages)
+
+    assert length(requests) == 4
+
+    [req_initial, req_tool_text, req_tool_structured, req_tool_final] = requests
+
+    assert Enum.map(req_initial, & &1.role) == ["user"]
+
+    assert Enum.map(req_tool_text, & &1.role) == ["user", "assistant", "tool"]
+    tool_call = Enum.at(req_tool_text, 1)
+    assert length(tool_call.tool_calls) == 1
+    tool_message_text = Enum.at(req_tool_text, 2)
+    assert is_binary(tool_message_text.content)
+
+    assert Enum.map(req_tool_structured, & &1.role) == ["user", "assistant", "tool"]
+    structured_content = Enum.at(req_tool_structured, 2).content
+    assert is_list(structured_content)
+    [%{"type" => "tool_result", "content" => [%{"text" => "42"}]}] = structured_content
+
+    assert Enum.map(req_tool_final, & &1.role) == ["user", "assistant", "tool"]
+    final_content = Enum.at(req_tool_final, 2).content
+    assert is_binary(final_content)
   end
 
   test "Message module supports both tool and function roles" do

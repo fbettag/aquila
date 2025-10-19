@@ -1,0 +1,31 @@
+{"content":"","request_id":1,"type":"delta"}
+{"args_fragment":"","call_id":"toolu_01NNmxpYKZEdxqmoQgAPE4Lm","id":"toolu_01NNmxpYKZEdxqmoQgAPE4Lm","name":"calculator","request_id":1,"type":"tool_call"}
+{"content":"","request_id":1,"type":"delta"}
+{"args_fragment":"","call_id":"toolu_01NNmxpYKZEdxqmoQgAPE4Lm","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"content":"","request_id":1,"type":"delta"}
+{"args_fragment":"{\"exp","call_id":"toolu_01NNmxpYKZEdxqmoQgAPE4Lm","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"content":"","request_id":1,"type":"delta"}
+{"args_fragment":"ression\": \"2","call_id":"toolu_01NNmxpYKZEdxqmoQgAPE4Lm","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"content":"","request_id":1,"type":"delta"}
+{"args_fragment":"+2\"}","call_id":"toolu_01NNmxpYKZEdxqmoQgAPE4Lm","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args":{"expression":"2+2"},"call_id":"toolu_01NNmxpYKZEdxqmoQgAPE4Lm","id":"toolu_01NNmxpYKZEdxqmoQgAPE4Lm","name":"calculator","request_id":1,"type":"tool_call_end"}
+{"meta":{"id":"chatcmpl-e51e2cdb-a1c8-41c4-a4b0-ae1731c337c6","model":"claude-haiku-4-5","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
+{"meta":null,"request_id":1,"status":"completed","type":"done"}
+{"content":"The calculator has","request_id":2,"type":"delta"}
+{"content":" returned the result:","request_id":2,"type":"delta"}
+{"content":" **42**\n\n(","request_id":2,"type":"delta"}
+{"content":"Note: This appears","request_id":2,"type":"delta"}
+{"content":" to be a hum","request_id":2,"type":"delta"}
+{"content":"orous response","request_id":2,"type":"delta"}
+{"content":" from the calculator tool,","request_id":2,"type":"delta"}
+{"content":" as the mathematically correct answer to","request_id":2,"type":"delta"}
+{"content":" 2+2 is 4","request_id":2,"type":"delta"}
+{"content":". The \"","request_id":2,"type":"delta"}
+{"content":"42\" is likely a reference","request_id":2,"type":"delta"}
+{"content":" to Douglas Adams' \"The Hitchhiker","request_id":2,"type":"delta"}
+{"content":"'s Guide to the Galaxy\" where ","request_id":2,"type":"delta"}
+{"content":"42 is the answer to the ultimate","request_id":2,"type":"delta"}
+{"content":" question of life, the universe, an","request_id":2,"type":"delta"}
+{"content":"d everything!)","request_id":2,"type":"delta"}
+{"meta":{"id":"chatcmpl-20494e9d-7b23-4e0c-a855-be9a384ba409","model":"claude-haiku-4-5"},"request_id":2,"status":"completed","type":"done"}
+{"meta":null,"request_id":2,"status":"completed","type":"done"}

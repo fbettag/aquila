@@ -54,7 +54,12 @@ defmodule Aquila.Engine do
       telemetry: %{start_time: nil, meta: %{}},
       error: nil,
       supports_tool_role: nil,
-      last_tool_outputs: []
+      tool_message_format: :text,
+      tool_choice: :auto,
+      tool_choice_forced?: false,
+      last_tool_outputs: [],
+      tool_call_history: [],
+      role_retry_count: 0
     ]
   end
 
@@ -103,6 +108,7 @@ defmodule Aquila.Engine do
     previous_response_id = opts[:previous_response_id] || opts[:response_id]
     store = Keyword.get(opts, :store)
     tool_context = Keyword.get(opts, :tool_context)
+    tool_choice = normalize_tool_choice(Keyword.get(opts, :tool_choice, :auto))
 
     telemetry_meta = %{endpoint: endpoint, model: to_string(model), stream?: stream?}
     telemetry = %{start_time: System.monotonic_time(), meta: telemetry_meta}
@@ -128,6 +134,7 @@ defmodule Aquila.Engine do
       tool_defs: tool_defs,
       tool_map: tool_map,
       tool_context: tool_context,
+      tool_choice: tool_choice,
       previous_response_id: previous_response_id,
       telemetry: telemetry
     }
@@ -181,15 +188,37 @@ defmodule Aquila.Engine do
         |> loop()
 
       match?(%{error: error} when not is_nil(error), state) ->
-        # Check if this is a role compatibility error that we can retry
-        case detect_role_compatibility_error(state.error, state) do
+        case detect_tool_message_format_error(state.error, state) do
           {:retry, new_state} ->
-            Logger.info("Detected role compatibility error, retrying with different format")
+            Logger.info("Detected tool message format error, retrying with updated content")
             loop(new_state)
 
           :no_retry ->
-            raise_error(state, state.error)
+            # Check if this is a role compatibility error that we can retry
+            case detect_role_compatibility_error(state.error, state) do
+              {:retry, new_state} ->
+                Logger.info("Detected role compatibility error, retrying with different format")
+                loop(new_state)
+
+              :no_retry ->
+                raise_error(state, state.error)
+            end
         end
+
+      state.status in [:completed, :succeeded, :done] and
+        state.tools != [] and
+        state.tool_call_history == [] and
+        state.tool_choice == :auto and
+          not state.tool_choice_forced? ->
+        Logger.info("No tool calls observed; retrying with forced tool choice")
+        loop(force_tool_choice(state))
+
+      state.status in [:completed, :succeeded, :done] and
+        state.tool_choice_forced? and
+        state.tool_call_history == [] and
+          state.tools != [] ->
+        Logger.warning("Forced tool choice ignored; executing fallback tool invocation")
+        execute_fallback_tool_calls(state)
 
       state.status in [:completed, :succeeded, :done] ->
         state
@@ -213,8 +242,41 @@ defmodule Aquila.Engine do
     new_state = Process.delete(key)
 
     case result do
-      {:ok, _ref} -> %{new_state | tool_payloads: []}
-      {:error, reason} -> raise_error(new_state || state, reason)
+      {:ok, _ref} ->
+        %{new_state | tool_payloads: []}
+
+      {:error, reason} ->
+        current_state = new_state || state
+
+        case detect_tool_message_format_error(reason, current_state) do
+          {:retry, retry_state} ->
+            Logger.info(
+              "Detected tool message format error in transport, retrying with updated content"
+            )
+
+            do_stream(retry_state)
+
+          :no_retry ->
+            # Check if we've already retried too many times
+            if current_state.role_retry_count >= 2 do
+              Logger.warning("Maximum role retries (2) exceeded, giving up")
+              raise_error(current_state, reason)
+            else
+              # Check if this is a role compatibility error before raising
+              case detect_role_compatibility_error(reason, current_state) do
+                {:retry, retry_state} ->
+                  Logger.info(
+                    "Detected role compatibility error in transport (retry #{retry_state.role_retry_count}), retrying with different format"
+                  )
+
+                  # Recursively retry with the updated state
+                  do_stream(retry_state)
+
+                :no_retry ->
+                  raise_error(current_state, reason)
+              end
+            end
+        end
     end
   end
 
@@ -345,33 +407,70 @@ defmodule Aquila.Engine do
   defp execute_tools(%State{} = state) do
     {ready, pending} = Enum.split_with(state.pending_calls, &(&1.status == :ready))
 
-    {payloads, {messages, tool_context, tool_outputs}} =
-      Enum.map_reduce(ready, {state.messages, state.tool_context, []}, fn call,
-                                                                          {msgs, ctx, outputs} ->
-        state_for_call = %{state | tool_context: ctx}
-        {payload, new_msgs, new_ctx} = invoke_tool(state_for_call, call, msgs)
-        # Store tool output info for potential retry
-        output_info = %{call_id: call.id, name: call.name, output: payload.output}
-        {payload, {new_msgs, new_ctx, [output_info | outputs]}}
-      end)
+    # Detect infinite tool call loops before executing
+    case detect_tool_loop(state, ready) do
+      {:loop_detected, call_signature} ->
+        Logger.warning(
+          "Detected tool call loop: #{inspect(call_signature)}, attempting role switch"
+        )
 
-    payloads = Enum.reverse(payloads)
-    tool_outputs = Enum.reverse(tool_outputs)
+        # Try switching role format
+        case state.supports_tool_role do
+          nil ->
+            # Currently using function role (default), try tool role
+            Logger.info("Switching from function role to tool role due to loop")
+            new_state = rebuild_messages_with_different_role(state, true)
+            %{new_state | tool_call_history: []}
 
-    updated_state =
-      case state.endpoint do
-        :responses -> %{state | tool_payloads: payloads, messages: messages}
-        :chat -> %{state | messages: messages}
-      end
+          true ->
+            # Already using tool role, try function role as last resort
+            Logger.info("Switching from tool role to function role due to loop")
+            new_state = rebuild_messages_with_different_role(state, false)
+            %{new_state | tool_call_history: []}
 
-    %{
-      updated_state
-      | pending_calls: pending,
-        status: :in_progress,
-        final_meta: append_tool_meta(state.final_meta, ready),
-        tool_context: tool_context,
-        last_tool_outputs: tool_outputs
-    }
+          false ->
+            # Already tried function role explicitly, give up
+            raise RuntimeError,
+                  "Tool call loop detected and both role formats attempted: #{inspect(call_signature)}"
+        end
+
+      :no_loop ->
+        # No loop detected, proceed normally
+        {payloads, {messages, tool_context, tool_outputs, call_history}} =
+          Enum.map_reduce(
+            ready,
+            {state.messages, state.tool_context, [], state.tool_call_history},
+            fn call, {msgs, ctx, outputs, history} ->
+              state_for_call = %{state | tool_context: ctx}
+              msgs_with_call = maybe_append_assistant_tool_call(state_for_call, msgs, call)
+              {payload, new_msgs, new_ctx} = invoke_tool(state_for_call, call, msgs_with_call)
+              # Store tool output info for potential retry
+              output_info = %{call_id: call.id, name: call.name, output: payload.output}
+              # Track this call in history
+              call_signature = {call.name, call.args}
+              {payload, {new_msgs, new_ctx, [output_info | outputs], [call_signature | history]}}
+            end
+          )
+
+        payloads = Enum.reverse(payloads)
+        tool_outputs = Enum.reverse(tool_outputs)
+
+        updated_state =
+          case state.endpoint do
+            :responses -> %{state | tool_payloads: payloads, messages: messages}
+            :chat -> %{state | messages: messages}
+          end
+
+        %{
+          updated_state
+          | pending_calls: pending,
+            status: :in_progress,
+            final_meta: append_tool_meta(state.final_meta, ready),
+            tool_context: tool_context,
+            last_tool_outputs: tool_outputs,
+            tool_call_history: call_history
+        }
+    end
   end
 
   defp invoke_tool(state, call, messages) do
@@ -648,7 +747,7 @@ defmodule Aquila.Engine do
       else
         base
         |> Map.put(:tools, state.tool_defs)
-        |> Map.put(:tool_choice, "auto")
+        |> Map.put(:tool_choice, encode_tool_choice(state.tool_choice))
       end
 
     Map.put(base, :metadata, state.metadata)
@@ -1098,31 +1197,281 @@ defmodule Aquila.Engine do
   # Creates a tool output message, using the appropriate role based on model capabilities.
   # Tries tool role first (newer format), falls back to function role if needed.
   defp create_tool_output_message(state, call, output) do
-    # Determine which role to use based on detection state
-    use_tool_role = should_use_tool_role?(state)
+    tool_output_message_for_state(state, call.name, call.call_id || call.id, output)
+  end
 
-    if use_tool_role do
-      # Use newer tool role format with tool_call_id (for GPT-5+)
-      Message.tool_output_message(call.name, output, tool_call_id: call.id)
+  defp tool_output_message_for_state(state, name, call_id, output) do
+    if should_use_tool_role?(state) do
+      Message.tool_output_message(
+        name,
+        output,
+        tool_call_id: call_id,
+        format: tool_message_format(state)
+      )
     else
-      # Use legacy function role format (for older models)
-      Message.function_message(call.name, output)
+      Message.function_message(name, output)
     end
   end
 
+  defp maybe_append_assistant_tool_call(%State{endpoint: :chat}, messages, call) do
+    append_assistant_tool_call_message(messages, call)
+  end
+
+  defp maybe_append_assistant_tool_call(_state, messages, _call), do: messages
+
+  defp append_assistant_tool_call_message(messages, call) do
+    call_id = call.call_id || call.id
+
+    already_present =
+      Enum.any?(messages, fn
+        %Message{role: :assistant, tool_calls: tool_calls} when is_list(tool_calls) ->
+          Enum.any?(tool_calls, &tool_call_matches?(&1, call_id))
+
+        _ ->
+          false
+      end)
+
+    args_map = extract_tool_call_args(call)
+
+    if already_present or args_map == %{} do
+      messages
+    else
+      entry = %{
+        "id" => call_id,
+        "type" => "function",
+        "function" => %{
+          "name" => call.name,
+          "arguments" => encode_tool_arguments(args_map)
+        }
+      }
+
+      messages ++ [Message.new(:assistant, "", tool_calls: [entry])]
+    end
+  end
+
+  defp tool_call_matches?(%{"id" => id}, call_id), do: id == call_id
+  defp tool_call_matches?(%{id: id}, call_id), do: id == call_id
+  defp tool_call_matches?(_, _), do: false
+
+  defp encode_tool_arguments(arguments) when is_binary(arguments), do: arguments
+  defp encode_tool_arguments(arguments) when is_map(arguments), do: Jason.encode!(arguments)
+  defp encode_tool_arguments(_), do: "{}"
+
+  defp force_tool_choice(%State{} = state) do
+    choice = compute_forced_tool_choice(state.tools)
+
+    state
+    |> Map.put(:tool_choice, choice)
+    |> Map.put(:tool_choice_forced?, true)
+    |> Map.put(:role_retry_count, 0)
+    |> reset_state_for_retry()
+  end
+
+  defp compute_forced_tool_choice(tools) do
+    case Enum.find_value(tools, &tool_name/1) do
+      nil -> :required
+      name -> {:function, name}
+    end
+  end
+
+  defp tool_name(%Tool{name: name}), do: name
+  defp tool_name(%{name: name}) when is_binary(name), do: name
+  defp tool_name(%{"name" => name}) when is_binary(name), do: name
+  defp tool_name(%{type: "function", function: %{"name" => name}}), do: name
+  defp tool_name(%{type: "function", function: %{name: name}}), do: name
+  defp tool_name(_), do: nil
+
+  defp reset_state_for_retry(state) do
+    %{
+      state
+      | acc_chunks: [],
+        raw_events: [],
+        pending_calls: [],
+        status: :in_progress,
+        final_meta: %{},
+        usage: %{},
+        tool_payloads: [],
+        last_tool_outputs: [],
+        tool_call_history: []
+    }
+  end
+
+  defp execute_fallback_tool_calls(%State{} = state) do
+    calls = fallback_tool_calls(state)
+
+    if calls == [] do
+      state
+    else
+      fallback_state =
+        state
+        |> Map.put(:pending_calls, calls)
+        |> Map.put(:error, nil)
+
+      executed_state = execute_tools(fallback_state)
+      %{executed_state | status: state.status}
+    end
+  end
+
+  defp fallback_tool_calls(%State{} = state) do
+    state
+    |> fallback_tools_to_invoke()
+    |> Enum.map(&tool_name/1)
+    |> Enum.filter(&tool_registered?(state, &1))
+    |> Enum.uniq()
+    |> Enum.map(&build_synthetic_call/1)
+  end
+
+  defp build_synthetic_call(name) do
+    id = generate_tool_call_id()
+
+    %{
+      id: id,
+      call_id: id,
+      name: name,
+      args: %{},
+      args_fragment: "{}",
+      status: :ready
+    }
+  end
+
+  defp fallback_tools_to_invoke(%State{tool_choice: {:function, name}} = state) do
+    Enum.filter(state.tools, &match_tool_name?(&1, name))
+  end
+
+  defp fallback_tools_to_invoke(%State{} = state), do: state.tools
+
+  defp match_tool_name?(%Tool{name: tool_name}, name) when is_binary(tool_name) do
+    tool_name == name
+  end
+
+  defp match_tool_name?(%{name: tool_name}, name) when is_binary(tool_name) do
+    tool_name == name
+  end
+
+  defp match_tool_name?(%{"name" => tool_name}, name) when is_binary(tool_name) do
+    tool_name == name
+  end
+
+  defp match_tool_name?(%{type: "function", function: %{"name" => tool_name}}, name) do
+    tool_name == name
+  end
+
+  defp match_tool_name?(%{type: "function", function: %{name: tool_name}}, name) do
+    tool_name == name
+  end
+
+  defp match_tool_name?(_, _), do: false
+
+  defp generate_tool_call_id do
+    "tool_fallback_" <> Base.encode16(:crypto.strong_rand_bytes(6), case: :lower)
+  end
+
+  defp tool_registered?(%State{tool_map: tool_map}, name) when is_binary(name) do
+    Map.has_key?(tool_map, name)
+  end
+
+  defp tool_registered?(_, _), do: false
+
+  defp extract_tool_call_args(call) do
+    cond do
+      is_map(call[:args]) and map_size(call[:args]) > 0 ->
+        call.args
+
+      is_binary(call[:args_fragment]) ->
+        fragment = String.trim(call.args_fragment)
+
+        if fragment != "" and fragment != "{}" do
+          case Jason.decode(fragment) do
+            {:ok, decoded} when is_map(decoded) -> decoded
+            _ -> %{}
+          end
+        else
+          %{}
+        end
+
+      true ->
+        %{}
+    end
+  end
+
+  # Detects if we're in a tool call loop (same tool being called repeatedly with same args).
+  # Returns {:loop_detected, call_signature} if loop found, :no_loop otherwise.
+  defp detect_tool_loop(%State{tool_call_history: history}, ready_calls) do
+    # Get signatures of calls we're about to make
+    new_signatures = Enum.map(ready_calls, fn call -> {call.name, call.args} end)
+
+    # Check if any of these signatures appear 2+ times in recent history (indicating loop)
+    Enum.find_value(new_signatures, :no_loop, fn signature ->
+      recent_count = Enum.count(Enum.take(history, 8), &(&1 == signature))
+      if recent_count >= 1, do: {:loop_detected, signature}, else: nil
+    end)
+  end
+
+  defp tool_message_format(%State{tool_message_format: format})
+       when format in [:text, :tool_result],
+       do: format
+
+  defp tool_message_format(_), do: :text
+
+  defp normalize_tool_choice(choice) do
+    case choice do
+      :auto -> :auto
+      "auto" -> :auto
+      :required -> :required
+      "required" -> :required
+      {:function, name} when is_binary(name) -> {:function, name}
+      {:function, name} when is_atom(name) -> {:function, Atom.to_string(name)}
+      %{} = map -> map
+      value when is_binary(value) -> value
+      value when is_atom(value) -> Atom.to_string(value)
+      _ -> :auto
+    end
+  end
+
+  defp encode_tool_choice(:auto), do: "auto"
+  defp encode_tool_choice(:required), do: "required"
+
+  defp encode_tool_choice({:function, name}) when is_binary(name) do
+    %{"type" => "function", "function" => %{"name" => name}}
+  end
+
+  defp encode_tool_choice({:function, name}) when is_atom(name) do
+    encode_tool_choice({:function, Atom.to_string(name)})
+  end
+
+  defp encode_tool_choice(%{} = choice), do: choice
+  defp encode_tool_choice(value) when is_binary(value), do: value
+  defp encode_tool_choice(value) when is_atom(value), do: Atom.to_string(value)
+  defp encode_tool_choice(_), do: "auto"
+
   # Determines whether to use the 'tool' role based on detection state.
-  # Returns true if we should try tool role, false for function role.
-  # Unknown: try function first (more compatible with older models)
-  defp should_use_tool_role?(%State{supports_tool_role: nil}), do: false
+  # Defaults to the newer tool role unless we've already proven it fails.
+  defp should_use_tool_role?(%State{supports_tool_role: nil}), do: true
   # Known to work
   defp should_use_tool_role?(%State{supports_tool_role: true}), do: true
   # Known to fail
   defp should_use_tool_role?(%State{supports_tool_role: false}), do: false
 
+  defp detect_tool_message_format_error(error, %State{} = state) do
+    message = extract_error_message(error)
+
+    cond do
+      requires_structured_tool_result?(message) and state.tool_message_format != :tool_result ->
+        {:retry, rebuild_messages_with_format(state, :tool_result)}
+
+      rejects_structured_tool_result?(message) and state.tool_message_format == :tool_result ->
+        {:retry, rebuild_messages_with_format(state, :text)}
+
+      true ->
+        :no_retry
+    end
+  end
+
   # Detects if an error is due to role compatibility and determines if we should retry.
   # Returns {:retry, new_state} if we should retry with a different role format,
   # or :no_retry if this is a different error or we've already tried both formats.
-  defp detect_role_compatibility_error(error, %State{endpoint: :chat} = state) do
+  # Works for both :chat and :responses endpoints.
+  defp detect_role_compatibility_error(error, %State{} = state) do
     error_message = extract_error_message(error)
 
     cond do
@@ -1144,8 +1493,6 @@ defmodule Aquila.Engine do
     end
   end
 
-  defp detect_role_compatibility_error(_error, _state), do: :no_retry
-
   # Extracts error message string from various error formats
   defp extract_error_message({:http_error, _code, body}) when is_binary(body) do
     case Jason.decode(body) do
@@ -1160,16 +1507,54 @@ defmodule Aquila.Engine do
 
   # Checks if error message indicates a specific role is not supported
   defp role_not_supported?(message, role) do
-    (String.contains?(message, "'#{role}'") and
-       String.contains?(message, "does not support")) or
-      String.contains?(message, "Unsupported value")
+    cond do
+      # Generic patterns for both roles
+      String.contains?(message, "'#{role}'") and String.contains?(message, "does not support") ->
+        true
+
+      String.contains?(message, "Unsupported value") ->
+        true
+
+      String.contains?(message, "unknown variant `#{role}`") ->
+        true
+
+      # Tool role specific errors
+      role == "tool" and String.contains?(message, "unexpected `tool_use_id`") ->
+        true
+
+      role == "tool" and
+          (String.contains?(
+             message,
+             "must be a response to a preceeding message with 'tool_calls'"
+           ) or
+             String.contains?(
+               message,
+               "must be a response to a preceding message with 'tool_calls'"
+             )) ->
+        true
+
+      # Function role specific errors
+      role == "function" and String.contains?(message, "unsupported role ROLE_FUNCTION") ->
+        true
+
+      role == "function" and String.contains?(message, "unknown role ROLE_FUNCTION") ->
+        true
+
+      true ->
+        false
+    end
   end
 
   # Rebuilds messages with a different tool role format after detecting incompatibility.
   # This removes tool output messages and recreates them with the specified role format.
   defp rebuild_messages_with_different_role(%State{} = state, use_tool_role) do
-    # Update the state to remember which format to use
-    updated_state = %{state | supports_tool_role: use_tool_role, error: nil}
+    # Update the state to remember which format to use and increment retry counter
+    updated_state = %{
+      state
+      | supports_tool_role: use_tool_role,
+        error: nil,
+        role_retry_count: state.role_retry_count + 1
+    }
 
     # Remove tool output messages (function or tool role) that were added in the last round
     cleaned_messages =
@@ -1180,15 +1565,40 @@ defmodule Aquila.Engine do
     # Recreate tool output messages with the new format using stored outputs
     new_tool_messages =
       Enum.map(updated_state.last_tool_outputs, fn %{call_id: call_id, name: name, output: output} ->
-        if use_tool_role do
-          Message.tool_output_message(name, output, tool_call_id: call_id)
-        else
-          Message.function_message(name, output)
-        end
+        tool_output_message_for_state(updated_state, name, call_id, output)
       end)
 
     rebuilt_messages = cleaned_messages ++ new_tool_messages
 
     %{updated_state | messages: rebuilt_messages}
+  end
+
+  defp rebuild_messages_with_format(%State{} = state, format) do
+    updated_state = %{state | tool_message_format: format, error: nil}
+
+    cleaned_messages =
+      Enum.reject(updated_state.messages, fn msg ->
+        msg.role in [:function, :tool]
+      end)
+
+    new_tool_messages =
+      Enum.map(updated_state.last_tool_outputs, fn %{call_id: call_id, name: name, output: output} ->
+        tool_output_message_for_state(updated_state, name, call_id, output)
+      end)
+
+    %{updated_state | messages: cleaned_messages ++ new_tool_messages}
+  end
+
+  defp requires_structured_tool_result?(message) do
+    String.contains?(message, "unexpected `tool_use_id`") or
+      String.contains?(message, "must have a corresponding `tool_use` block") or
+      String.contains?(message, "tool_call_id  is not found") or
+      String.contains?(message, "tool_call_id is not found") or
+      String.contains?(message, "must be a response to a preceding message with 'tool_calls'") or
+      String.contains?(message, "must be a response to a preceeding message with 'tool_calls'")
+  end
+
+  defp rejects_structured_tool_result?(message) do
+    String.contains?(message, "Invalid value: 'tool_result'")
   end
 end

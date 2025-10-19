@@ -572,15 +572,21 @@ defmodule Aquila.Transport.OpenAI do
       args_json = Enum.join(call.fragments, "")
 
       args =
-        case Jason.decode(args_json) do
-          {:ok, decoded} ->
-            decoded
-
-          {:error, error} ->
-            require Logger
-            Logger.error("Failed to decode tool args JSON: #{inspect(error)}")
-            Logger.error("Args JSON was: #{inspect(args_json)}")
+        cond do
+          args_json == "" ->
             %{}
+
+          true ->
+            case Jason.decode(args_json) do
+              {:ok, decoded} ->
+                decoded
+
+              {:error, error} ->
+                require Logger
+                Logger.warning("Failed to decode tool args JSON: #{inspect(error)}")
+                Logger.debug("Args JSON was: #{inspect(args_json)}")
+                %{}
+            end
         end
 
       %{
