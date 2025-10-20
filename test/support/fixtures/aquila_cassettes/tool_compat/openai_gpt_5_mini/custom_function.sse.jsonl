@@ -1,101 +1,69 @@
-{"args_fragment":"","call_id":"call_tFUGI11yQSBxyMLmgQaZVT3z","id":"call_tFUGI11yQSBxyMLmgQaZVT3z","name":"calculator","request_id":1,"type":"tool_call"}
-{"args_fragment":"{\"","call_id":"call_tFUGI11yQSBxyMLmgQaZVT3z","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"expression","call_id":"call_tFUGI11yQSBxyMLmgQaZVT3z","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"\":\"","call_id":"call_tFUGI11yQSBxyMLmgQaZVT3z","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"2","call_id":"call_tFUGI11yQSBxyMLmgQaZVT3z","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"+","call_id":"call_tFUGI11yQSBxyMLmgQaZVT3z","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"2","call_id":"call_tFUGI11yQSBxyMLmgQaZVT3z","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"\"}","call_id":"call_tFUGI11yQSBxyMLmgQaZVT3z","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args":{"expression":"2+2"},"call_id":"call_tFUGI11yQSBxyMLmgQaZVT3z","id":"call_tFUGI11yQSBxyMLmgQaZVT3z","name":"calculator","request_id":1,"type":"tool_call_end"}
-{"meta":{"id":"chatcmpl-CSR9MSLVpqjSsBKOEWCqgQRPK4vJk","model":"gpt-5-mini","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
+{"args_fragment":"","call_id":"call_N9Xp0YdZXiQsNauj6KpE81Ye","id":"call_N9Xp0YdZXiQsNauj6KpE81Ye","name":"calculator","request_id":1,"type":"tool_call"}
+{"args_fragment":"{\"","call_id":"call_N9Xp0YdZXiQsNauj6KpE81Ye","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"expression","call_id":"call_N9Xp0YdZXiQsNauj6KpE81Ye","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"\":\"","call_id":"call_N9Xp0YdZXiQsNauj6KpE81Ye","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"2","call_id":"call_N9Xp0YdZXiQsNauj6KpE81Ye","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"+","call_id":"call_N9Xp0YdZXiQsNauj6KpE81Ye","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"2","call_id":"call_N9Xp0YdZXiQsNauj6KpE81Ye","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"\"}","call_id":"call_N9Xp0YdZXiQsNauj6KpE81Ye","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args":{"expression":"2+2"},"call_id":"call_N9Xp0YdZXiQsNauj6KpE81Ye","id":"call_N9Xp0YdZXiQsNauj6KpE81Ye","name":"calculator","request_id":1,"type":"tool_call_end"}
+{"meta":{"id":"chatcmpl-CSlGeSTqDGkp8PcrQJMw2yTMWC2n0","model":"gpt-5-mini","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
 {"request_id":1,"type":"usage","usage":{"completion_tokens":25,"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":0,"rejected_prediction_tokens":0},"prompt_tokens":169,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"total_tokens":194}}
 {"meta":null,"request_id":1,"status":"completed","type":"done"}
-{"args_fragment":"","call_id":"call_QgFP7YVLmJMWzSxMBJIElhNn","id":"call_QgFP7YVLmJMWzSxMBJIElhNn","name":"calculator","request_id":2,"type":"tool_call"}
-{"args_fragment":"{\"","call_id":"call_QgFP7YVLmJMWzSxMBJIElhNn","id":null,"name":null,"request_id":2,"type":"tool_call"}
-{"args_fragment":"expression","call_id":"call_QgFP7YVLmJMWzSxMBJIElhNn","id":null,"name":null,"request_id":2,"type":"tool_call"}
-{"args_fragment":"\":\"","call_id":"call_QgFP7YVLmJMWzSxMBJIElhNn","id":null,"name":null,"request_id":2,"type":"tool_call"}
-{"args_fragment":"2","call_id":"call_QgFP7YVLmJMWzSxMBJIElhNn","id":null,"name":null,"request_id":2,"type":"tool_call"}
-{"args_fragment":"+","call_id":"call_QgFP7YVLmJMWzSxMBJIElhNn","id":null,"name":null,"request_id":2,"type":"tool_call"}
-{"args_fragment":"2","call_id":"call_QgFP7YVLmJMWzSxMBJIElhNn","id":null,"name":null,"request_id":2,"type":"tool_call"}
-{"args_fragment":"\"}","call_id":"call_QgFP7YVLmJMWzSxMBJIElhNn","id":null,"name":null,"request_id":2,"type":"tool_call"}
-{"args":{"expression":"2+2"},"call_id":"call_QgFP7YVLmJMWzSxMBJIElhNn","id":"call_QgFP7YVLmJMWzSxMBJIElhNn","name":"calculator","request_id":2,"type":"tool_call_end"}
-{"meta":{"id":"chatcmpl-CSR9OL40HPwHW1KoOolbM1DELSJOj","model":"gpt-5-mini","reason":"tool_calls"},"request_id":2,"status":"requires_action","type":"done"}
-{"request_id":2,"type":"usage","usage":{"completion_tokens":281,"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":256,"rejected_prediction_tokens":0},"prompt_tokens":203,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"total_tokens":484}}
+{"content":"I","request_id":2,"type":"delta"}
+{"content":" used","request_id":2,"type":"delta"}
+{"content":" the","request_id":2,"type":"delta"}
+{"content":" calculator","request_id":2,"type":"delta"}
+{"content":" tool","request_id":2,"type":"delta"}
+{"content":";","request_id":2,"type":"delta"}
+{"content":" it","request_id":2,"type":"delta"}
+{"content":" returned","request_id":2,"type":"delta"}
+{"content":":","request_id":2,"type":"delta"}
+{"content":" \"","request_id":2,"type":"delta"}
+{"content":"The","request_id":2,"type":"delta"}
+{"content":" result","request_id":2,"type":"delta"}
+{"content":" is","request_id":2,"type":"delta"}
+{"content":" ","request_id":2,"type":"delta"}
+{"content":"42","request_id":2,"type":"delta"}
+{"content":".\"\n\n","request_id":2,"type":"delta"}
+{"content":"That","request_id":2,"type":"delta"}
+{"content":" output","request_id":2,"type":"delta"}
+{"content":" is","request_id":2,"type":"delta"}
+{"content":" incorrect","request_id":2,"type":"delta"}
+{"content":".","request_id":2,"type":"delta"}
+{"content":" The","request_id":2,"type":"delta"}
+{"content":" correct","request_id":2,"type":"delta"}
+{"content":" value","request_id":2,"type":"delta"}
+{"content":" is","request_id":2,"type":"delta"}
+{"content":" ","request_id":2,"type":"delta"}
+{"content":"2","request_id":2,"type":"delta"}
+{"content":" +","request_id":2,"type":"delta"}
+{"content":" ","request_id":2,"type":"delta"}
+{"content":"2","request_id":2,"type":"delta"}
+{"content":" =","request_id":2,"type":"delta"}
+{"content":" ","request_id":2,"type":"delta"}
+{"content":"4","request_id":2,"type":"delta"}
+{"content":".\n\n","request_id":2,"type":"delta"}
+{"content":"If","request_id":2,"type":"delta"}
+{"content":" you","request_id":2,"type":"delta"}
+{"content":" want","request_id":2,"type":"delta"}
+{"content":",","request_id":2,"type":"delta"}
+{"content":" I","request_id":2,"type":"delta"}
+{"content":" can","request_id":2,"type":"delta"}
+{"content":" run","request_id":2,"type":"delta"}
+{"content":" the","request_id":2,"type":"delta"}
+{"content":" calculator","request_id":2,"type":"delta"}
+{"content":" tool","request_id":2,"type":"delta"}
+{"content":" again","request_id":2,"type":"delta"}
+{"content":" or","request_id":2,"type":"delta"}
+{"content":" troubleshoot","request_id":2,"type":"delta"}
+{"content":" why","request_id":2,"type":"delta"}
+{"content":" it","request_id":2,"type":"delta"}
+{"content":" produced","request_id":2,"type":"delta"}
+{"content":" the","request_id":2,"type":"delta"}
+{"content":" wrong","request_id":2,"type":"delta"}
+{"content":" result","request_id":2,"type":"delta"}
+{"content":".","request_id":2,"type":"delta"}
+{"meta":{"id":"chatcmpl-CSlGgg7luHP6uYtBK6yrlzJo5VHkb","model":"gpt-5-mini"},"request_id":2,"status":"completed","type":"done"}
+{"request_id":2,"type":"usage","usage":{"completion_tokens":383,"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":320,"rejected_prediction_tokens":0},"prompt_tokens":203,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"total_tokens":586}}
 {"meta":null,"request_id":2,"status":"completed","type":"done"}
-{"args_fragment":"","call_id":"call_mJNqSAOFgTGe4Xqrhre7doPq","id":"call_mJNqSAOFgTGe4Xqrhre7doPq","name":"calculator","request_id":3,"type":"tool_call"}
-{"args_fragment":"{\"","call_id":"call_mJNqSAOFgTGe4Xqrhre7doPq","id":null,"name":null,"request_id":3,"type":"tool_call"}
-{"args_fragment":"expression","call_id":"call_mJNqSAOFgTGe4Xqrhre7doPq","id":null,"name":null,"request_id":3,"type":"tool_call"}
-{"args_fragment":"\":\"","call_id":"call_mJNqSAOFgTGe4Xqrhre7doPq","id":null,"name":null,"request_id":3,"type":"tool_call"}
-{"args_fragment":"2","call_id":"call_mJNqSAOFgTGe4Xqrhre7doPq","id":null,"name":null,"request_id":3,"type":"tool_call"}
-{"args_fragment":"+","call_id":"call_mJNqSAOFgTGe4Xqrhre7doPq","id":null,"name":null,"request_id":3,"type":"tool_call"}
-{"args_fragment":"2","call_id":"call_mJNqSAOFgTGe4Xqrhre7doPq","id":null,"name":null,"request_id":3,"type":"tool_call"}
-{"args_fragment":"\"}","call_id":"call_mJNqSAOFgTGe4Xqrhre7doPq","id":null,"name":null,"request_id":3,"type":"tool_call"}
-{"args":{"expression":"2+2"},"call_id":"call_mJNqSAOFgTGe4Xqrhre7doPq","id":"call_mJNqSAOFgTGe4Xqrhre7doPq","name":"calculator","request_id":3,"type":"tool_call_end"}
-{"meta":{"id":"chatcmpl-CSR9UFxtG3J96V3q143yRAa7MTc8J","model":"gpt-5-mini","reason":"tool_calls"},"request_id":3,"status":"requires_action","type":"done"}
-{"request_id":3,"type":"usage","usage":{"completion_tokens":153,"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":128,"rejected_prediction_tokens":0},"prompt_tokens":203,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"total_tokens":356}}
-{"meta":null,"request_id":3,"status":"completed","type":"done"}
-{"content":"The","request_id":4,"type":"delta"}
-{"content":" correct","request_id":4,"type":"delta"}
-{"content":" result","request_id":4,"type":"delta"}
-{"content":" is","request_id":4,"type":"delta"}
-{"content":" ","request_id":4,"type":"delta"}
-{"content":"4","request_id":4,"type":"delta"}
-{"content":".\n\n","request_id":4,"type":"delta"}
-{"content":"I","request_id":4,"type":"delta"}
-{"content":" used","request_id":4,"type":"delta"}
-{"content":" the","request_id":4,"type":"delta"}
-{"content":" calculator","request_id":4,"type":"delta"}
-{"content":" tool","request_id":4,"type":"delta"}
-{"content":" as","request_id":4,"type":"delta"}
-{"content":" you","request_id":4,"type":"delta"}
-{"content":" requested","request_id":4,"type":"delta"}
-{"content":";","request_id":4,"type":"delta"}
-{"content":" its","request_id":4,"type":"delta"}
-{"content":" response","request_id":4,"type":"delta"}
-{"content":" was","request_id":4,"type":"delta"}
-{"content":":","request_id":4,"type":"delta"}
-{"content":" \"","request_id":4,"type":"delta"}
-{"content":"The","request_id":4,"type":"delta"}
-{"content":" result","request_id":4,"type":"delta"}
-{"content":" is","request_id":4,"type":"delta"}
-{"content":" ","request_id":4,"type":"delta"}
-{"content":"42","request_id":4,"type":"delta"}
-{"content":"\"","request_id":4,"type":"delta"}
-{"content":" —","request_id":4,"type":"delta"}
-{"content":" that","request_id":4,"type":"delta"}
-{"content":" response","request_id":4,"type":"delta"}
-{"content":" is","request_id":4,"type":"delta"}
-{"content":" incorrect","request_id":4,"type":"delta"}
-{"content":".","request_id":4,"type":"delta"}
-{"content":" By","request_id":4,"type":"delta"}
-{"content":" basic","request_id":4,"type":"delta"}
-{"content":" arithmetic","request_id":4,"type":"delta"}
-{"content":",","request_id":4,"type":"delta"}
-{"content":" ","request_id":4,"type":"delta"}
-{"content":"2","request_id":4,"type":"delta"}
-{"content":" +","request_id":4,"type":"delta"}
-{"content":" ","request_id":4,"type":"delta"}
-{"content":"2","request_id":4,"type":"delta"}
-{"content":" =","request_id":4,"type":"delta"}
-{"content":" ","request_id":4,"type":"delta"}
-{"content":"4","request_id":4,"type":"delta"}
-{"content":".","request_id":4,"type":"delta"}
-{"content":" Would","request_id":4,"type":"delta"}
-{"content":" you","request_id":4,"type":"delta"}
-{"content":" like","request_id":4,"type":"delta"}
-{"content":" me","request_id":4,"type":"delta"}
-{"content":" to","request_id":4,"type":"delta"}
-{"content":" run","request_id":4,"type":"delta"}
-{"content":" the","request_id":4,"type":"delta"}
-{"content":" calculator","request_id":4,"type":"delta"}
-{"content":" tool","request_id":4,"type":"delta"}
-{"content":" again","request_id":4,"type":"delta"}
-{"content":" or","request_id":4,"type":"delta"}
-{"content":" try","request_id":4,"type":"delta"}
-{"content":" a","request_id":4,"type":"delta"}
-{"content":" different","request_id":4,"type":"delta"}
-{"content":" method","request_id":4,"type":"delta"}
-{"content":"?","request_id":4,"type":"delta"}
-{"meta":{"id":"chatcmpl-CSR9YoIALkCkLfVV6mKKPOgJjQ6c2","model":"gpt-5-mini"},"request_id":4,"status":"completed","type":"done"}
-{"request_id":4,"type":"usage","usage":{"completion_tokens":391,"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":320,"rejected_prediction_tokens":0},"prompt_tokens":237,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"total_tokens":628}}
-{"meta":null,"request_id":4,"status":"completed","type":"done"}

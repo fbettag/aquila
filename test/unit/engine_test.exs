@@ -169,6 +169,55 @@ defmodule Aquila.EngineTest do
     end
   end
 
+  defmodule EmptyArgsTransport do
+    @behaviour Aquila.Transport
+
+    @impl true
+    def post(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def get(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def delete(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def stream(req, callback) do
+      round = Process.get(:empty_args_round, 0)
+      Process.put(:empty_args_round, round + 1)
+
+      requests = Process.get(:empty_args_requests, [])
+      Process.put(:empty_args_requests, [req.body | requests])
+
+      case round do
+        0 ->
+          callback.(%{
+            type: :tool_call,
+            id: "noop-1",
+            name: "noop",
+            args_fragment: "",
+            call_id: "noop-1"
+          })
+
+          callback.(%{
+            type: :tool_call_end,
+            id: "noop-1",
+            name: "noop",
+            args: %{},
+            call_id: "noop-1"
+          })
+
+          callback.(%{type: :done, status: :requires_action})
+          {:ok, make_ref()}
+
+        _ ->
+          callback.(%{type: :delta, content: "done"})
+          callback.(%{type: :done, status: :completed})
+          {:ok, make_ref()}
+      end
+    end
+  end
+
   defmodule RoundRobinTransport do
     @behaviour Aquila.Transport
 
@@ -659,6 +708,56 @@ defmodule Aquila.EngineTest do
     assert Enum.map(req_tool_final, & &1.role) == ["user", "assistant", "tool"]
     final_content = Enum.at(req_tool_final, 2).content
     assert is_binary(final_content)
+  end
+
+  test "engine includes assistant tool call even when arguments are empty" do
+    cleanup = fn ->
+      Process.delete(:empty_args_requests)
+      Process.delete(:empty_args_round)
+    end
+
+    cleanup.()
+    on_exit(cleanup)
+
+    tool = Tool.new("noop", fn _args -> "done" end)
+
+    response =
+      Engine.run("Ping",
+        transport: EmptyArgsTransport,
+        tools: [tool],
+        endpoint: :chat,
+        model: "openai/gpt-4.1"
+      )
+
+    assert response.text == "done"
+
+    requests =
+      Process.get(:empty_args_requests, [])
+      |> Enum.reverse()
+      |> Enum.map(& &1.messages)
+
+    assert length(requests) >= 2
+
+    second_request = Enum.at(requests, 1)
+
+    assistant_with_tool =
+      Enum.find(second_request, fn msg ->
+        Map.get(msg, :role) == "assistant" and is_list(Map.get(msg, :tool_calls))
+      end)
+
+    refute assistant_with_tool == nil
+
+    [tool_call] = Map.get(assistant_with_tool, :tool_calls)
+    assert tool_call["id"] == "noop-1"
+    assert get_in(tool_call, ["function", "arguments"]) == "{}"
+
+    tool_message =
+      Enum.find(second_request, fn msg ->
+        Map.get(msg, :role) == "tool"
+      end)
+
+    refute tool_message == nil
+    assert Map.get(tool_message, :tool_call_id) == "noop-1"
   end
 
   test "Message module supports both tool and function roles" do

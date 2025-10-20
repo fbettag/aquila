@@ -444,8 +444,14 @@ defmodule Aquila.Engine do
               state_for_call = %{state | tool_context: ctx}
               msgs_with_call = maybe_append_assistant_tool_call(state_for_call, msgs, call)
               {payload, new_msgs, new_ctx} = invoke_tool(state_for_call, call, msgs_with_call)
-              # Store tool output info for potential retry
-              output_info = %{call_id: call.id, name: call.name, output: payload.output}
+              # Store tool output info for potential retry (include args for role switching)
+              output_info = %{
+                call_id: call.id,
+                name: call.name,
+                args: call.args,
+                output: payload.output
+              }
+
               # Track this call in history
               call_signature = {call.name, call.args}
               {payload, {new_msgs, new_ctx, [output_info | outputs], [call_signature | history]}}
@@ -1233,7 +1239,7 @@ defmodule Aquila.Engine do
 
     args_map = extract_tool_call_args(call)
 
-    if already_present or args_map == %{} do
+    if already_present do
       messages
     else
       entry = %{
@@ -1470,26 +1476,32 @@ defmodule Aquila.Engine do
   # Detects if an error is due to role compatibility and determines if we should retry.
   # Returns {:retry, new_state} if we should retry with a different role format,
   # or :no_retry if this is a different error or we've already tried both formats.
-  # Works for both :chat and :responses endpoints.
+  # Only applies to :chat endpoint. Role compatibility issues don't apply to :responses endpoint.
   defp detect_role_compatibility_error(error, %State{} = state) do
-    error_message = extract_error_message(error)
+    # Role compatibility only applies to chat endpoint, not responses endpoint
+    if state.endpoint == :responses do
+      Logger.debug("Skipping role compatibility retry for responses endpoint")
+      :no_retry
+    else
+      error_message = extract_error_message(error)
 
-    cond do
-      # Error indicates 'tool' role is not supported and we haven't tried function role yet
-      role_not_supported?(error_message, "tool") and state.supports_tool_role != false ->
-        Logger.debug("Model does not support 'tool' role, switching to 'function' role")
-        new_state = rebuild_messages_with_different_role(state, false)
-        {:retry, new_state}
+      cond do
+        # Error indicates 'tool' role is not supported and we haven't tried function role yet
+        role_not_supported?(error_message, "tool") and state.supports_tool_role != false ->
+          Logger.debug("Model does not support 'tool' role, switching to 'function' role")
+          new_state = rebuild_messages_with_different_role(state, false)
+          {:retry, new_state}
 
-      # Error indicates 'function' role is not supported and we haven't tried tool role yet
-      role_not_supported?(error_message, "function") and state.supports_tool_role != true ->
-        Logger.debug("Model does not support 'function' role, switching to 'tool' role")
-        new_state = rebuild_messages_with_different_role(state, true)
-        {:retry, new_state}
+        # Error indicates 'function' role is not supported and we haven't tried tool role yet
+        role_not_supported?(error_message, "function") and state.supports_tool_role != true ->
+          Logger.debug("Model does not support 'function' role, switching to 'tool' role")
+          new_state = rebuild_messages_with_different_role(state, true)
+          {:retry, new_state}
 
-      # Either not a role error, or we've already tried both formats
-      true ->
-        :no_retry
+        # Either not a role error, or we've already tried both formats
+        true ->
+          :no_retry
+      end
     end
   end
 
@@ -1546,7 +1558,7 @@ defmodule Aquila.Engine do
   end
 
   # Rebuilds messages with a different tool role format after detecting incompatibility.
-  # This removes tool output messages and recreates them with the specified role format.
+  # This removes both assistant tool call messages and tool output messages, then recreates them.
   defp rebuild_messages_with_different_role(%State{} = state, use_tool_role) do
     # Update the state to remember which format to use and increment retry counter
     updated_state = %{
@@ -1556,21 +1568,48 @@ defmodule Aquila.Engine do
         role_retry_count: state.role_retry_count + 1
     }
 
-    # Remove tool output messages (function or tool role) that were added in the last round
+    # Remove both assistant tool call messages and tool output messages
+    # We need to remove the entire tool call/response pair to rebuild them correctly
     cleaned_messages =
       Enum.reject(updated_state.messages, fn msg ->
-        msg.role in [:function, :tool]
+        # Remove tool output messages (function or tool role)
+        # Also remove assistant messages that contain tool_calls
+        msg.role in [:function, :tool] or
+          (msg.role == :assistant and is_list(msg.tool_calls) and length(msg.tool_calls) > 0)
       end)
 
-    # Recreate tool output messages with the new format using stored outputs
-    new_tool_messages =
-      Enum.map(updated_state.last_tool_outputs, fn %{call_id: call_id, name: name, output: output} ->
-        tool_output_message_for_state(updated_state, name, call_id, output)
+    # Now rebuild both assistant tool call messages and tool output messages
+    # Use the stored args from last_tool_outputs to properly reconstruct assistant messages
+    new_messages =
+      Enum.reduce(updated_state.last_tool_outputs, cleaned_messages, fn %{
+                                                                          call_id: call_id,
+                                                                          name: name,
+                                                                          args: args,
+                                                                          output: output
+                                                                        },
+                                                                        acc ->
+        # Create assistant tool call message with proper arguments
+        args_map = args || %{}
+        encoded_args = encode_tool_arguments(args_map)
+
+        assistant_entry = %{
+          "id" => call_id,
+          "type" => "function",
+          "function" => %{
+            "name" => name,
+            "arguments" => encoded_args
+          }
+        }
+
+        assistant_msg = Message.new(:assistant, "", tool_calls: [assistant_entry])
+
+        # Create tool output message with the new role format
+        tool_msg = tool_output_message_for_state(updated_state, name, call_id, output)
+
+        acc ++ [assistant_msg, tool_msg]
       end)
 
-    rebuilt_messages = cleaned_messages ++ new_tool_messages
-
-    %{updated_state | messages: rebuilt_messages}
+    %{updated_state | messages: new_messages}
   end
 
   defp rebuild_messages_with_format(%State{} = state, format) do

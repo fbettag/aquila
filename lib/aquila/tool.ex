@@ -78,7 +78,7 @@ defmodule Aquila.Tool do
     function =
       maybe_put(%{name: name, parameters: parameters}, :description, description)
 
-    %{type: "function", function: function, name: name}
+    %{type: "function", function: function}
   end
 
   def to_openai(%{type: type} = map) when is_atom(type) do
@@ -111,20 +111,17 @@ defmodule Aquila.Tool do
         {_atom_name, _} -> Map.delete(function, "name")
       end
 
+    # Don't add top-level name field as it's not supported by all providers (e.g., Mistral)
+    # The name should only be inside the function object
     base = %{map | type: type, function: updated_function}
 
+    # Preserve existing top-level name if it was explicitly provided, but don't add it from function.name
     cond do
       Map.has_key?(base, :name) ->
         base
 
       Map.has_key?(base, "name") ->
         base
-
-      name = Map.get(updated_function, :name) ->
-        Map.put(base, :name, name)
-
-      name = Map.get(updated_function, "name") ->
-        Map.put(base, "name", name)
 
       true ->
         base

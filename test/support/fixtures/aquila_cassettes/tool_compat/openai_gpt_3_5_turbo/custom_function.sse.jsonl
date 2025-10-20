@@ -1,13 +1,13 @@
-{"args_fragment":"","call_id":"call_oAdToMZu6hBv2YrCzsexeJYP","id":"call_oAdToMZu6hBv2YrCzsexeJYP","name":"calculator","request_id":1,"type":"tool_call"}
-{"args_fragment":"{\"","call_id":"call_oAdToMZu6hBv2YrCzsexeJYP","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"expression","call_id":"call_oAdToMZu6hBv2YrCzsexeJYP","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"\":\"","call_id":"call_oAdToMZu6hBv2YrCzsexeJYP","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"2","call_id":"call_oAdToMZu6hBv2YrCzsexeJYP","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"+","call_id":"call_oAdToMZu6hBv2YrCzsexeJYP","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"2","call_id":"call_oAdToMZu6hBv2YrCzsexeJYP","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"\"}","call_id":"call_oAdToMZu6hBv2YrCzsexeJYP","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args":{"expression":"2+2"},"call_id":"call_oAdToMZu6hBv2YrCzsexeJYP","id":"call_oAdToMZu6hBv2YrCzsexeJYP","name":"calculator","request_id":1,"type":"tool_call_end"}
-{"meta":{"id":"chatcmpl-CSR9wliiUA7fLQvQQa6BhAxXhdFvX","model":"gpt-3.5-turbo","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
+{"args_fragment":"","call_id":"call_W5NFaj4BCC5lZMinbQYtEWRM","id":"call_W5NFaj4BCC5lZMinbQYtEWRM","name":"calculator","request_id":1,"type":"tool_call"}
+{"args_fragment":"{\"","call_id":"call_W5NFaj4BCC5lZMinbQYtEWRM","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"expression","call_id":"call_W5NFaj4BCC5lZMinbQYtEWRM","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"\":\"","call_id":"call_W5NFaj4BCC5lZMinbQYtEWRM","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"2","call_id":"call_W5NFaj4BCC5lZMinbQYtEWRM","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"+","call_id":"call_W5NFaj4BCC5lZMinbQYtEWRM","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"2","call_id":"call_W5NFaj4BCC5lZMinbQYtEWRM","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"\"}","call_id":"call_W5NFaj4BCC5lZMinbQYtEWRM","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args":{"expression":"2+2"},"call_id":"call_W5NFaj4BCC5lZMinbQYtEWRM","id":"call_W5NFaj4BCC5lZMinbQYtEWRM","name":"calculator","request_id":1,"type":"tool_call_end"}
+{"meta":{"id":"chatcmpl-CSlH59sHywMD9smMV4oxQHf7kvjcH","model":"gpt-3.5-turbo","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
 {"request_id":1,"type":"usage","usage":{"completion_tokens":16,"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":0,"rejected_prediction_tokens":0},"prompt_tokens":90,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"total_tokens":106}}
 {"meta":null,"request_id":1,"status":"completed","type":"done"}
 {"content":"The","request_id":2,"type":"delta"}
@@ -15,12 +15,13 @@
 {"content":" of","request_id":2,"type":"delta"}
 {"content":" ","request_id":2,"type":"delta"}
 {"content":"2","request_id":2,"type":"delta"}
-{"content":"+","request_id":2,"type":"delta"}
+{"content":" +","request_id":2,"type":"delta"}
+{"content":" ","request_id":2,"type":"delta"}
 {"content":"2","request_id":2,"type":"delta"}
 {"content":" is","request_id":2,"type":"delta"}
 {"content":" ","request_id":2,"type":"delta"}
 {"content":"4","request_id":2,"type":"delta"}
 {"content":".","request_id":2,"type":"delta"}
-{"meta":{"id":"chatcmpl-CSR9xdWvcdHbopzNKg1DMbj1t2jHQ","model":"gpt-3.5-turbo"},"request_id":2,"status":"completed","type":"done"}
-{"request_id":2,"type":"usage","usage":{"completion_tokens":12,"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":0,"rejected_prediction_tokens":0},"prompt_tokens":118,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"total_tokens":130}}
+{"meta":{"id":"chatcmpl-CSlH6IimdG72Fg6YygpMF03GNf5fJ","model":"gpt-3.5-turbo"},"request_id":2,"status":"completed","type":"done"}
+{"request_id":2,"type":"usage","usage":{"completion_tokens":13,"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":0,"rejected_prediction_tokens":0},"prompt_tokens":118,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"total_tokens":131}}
 {"meta":null,"request_id":2,"status":"completed","type":"done"}

@@ -1,16 +1,7 @@
 {"content":"I","request_id":1,"type":"delta"}
 {"content":"'","request_id":1,"type":"delta"}
 {"content":"m","request_id":1,"type":"delta"}
-{"content":" sorry","request_id":1,"type":"delta"}
-{"content":" for","request_id":1,"type":"delta"}
-{"content":" any","request_id":1,"type":"delta"}
-{"content":" confusion","request_id":1,"type":"delta"}
-{"content":",","request_id":1,"type":"delta"}
-{"content":" but","request_id":1,"type":"delta"}
-{"content":" I","request_id":1,"type":"delta"}
-{"content":"'","request_id":1,"type":"delta"}
-{"content":"m","request_id":1,"type":"delta"}
-{"content":" a","request_id":1,"type":"delta"}
+{"content":" an","request_id":1,"type":"delta"}
 {"content":" text","request_id":1,"type":"delta"}
 {"content":"-","request_id":1,"type":"delta"}
 {"content":"based","request_id":1,"type":"delta"}
@@ -24,23 +15,27 @@
 {"content":" the","request_id":1,"type":"delta"}
 {"content":" ability","request_id":1,"type":"delta"}
 {"content":" to","request_id":1,"type":"delta"}
-{"content":" use","request_id":1,"type":"delta"}
-{"content":" external","request_id":1,"type":"delta"}
-{"content":" tools","request_id":1,"type":"delta"}
-{"content":" or","request_id":1,"type":"delta"}
+{"content":" perform","request_id":1,"type":"delta"}
+{"content":" calculations","request_id":1,"type":"delta"}
+{"content":" using","request_id":1,"type":"delta"}
+{"content":" a","request_id":1,"type":"delta"}
 {"content":" calcul","request_id":1,"type":"delta"}
-{"content":"ators","request_id":1,"type":"delta"}
+{"content":"ator","request_id":1,"type":"delta"}
+{"content":" tool","request_id":1,"type":"delta"}
 {"content":".","request_id":1,"type":"delta"}
 {"content":" However","request_id":1,"type":"delta"}
 {"content":",","request_id":1,"type":"delta"}
 {"content":" I","request_id":1,"type":"delta"}
 {"content":" can","request_id":1,"type":"delta"}
-{"content":" certainly","request_id":1,"type":"delta"}
 {"content":" help","request_id":1,"type":"delta"}
 {"content":" you","request_id":1,"type":"delta"}
-{"content":" perform","request_id":1,"type":"delta"}
-{"content":" the","request_id":1,"type":"delta"}
-{"content":" calculation","request_id":1,"type":"delta"}
+{"content":" calculate","request_id":1,"type":"delta"}
+{"content":" ","request_id":1,"type":"delta"}
+{"content":"2","request_id":1,"type":"delta"}
+{"content":"+","request_id":1,"type":"delta"}
+{"content":"2","request_id":1,"type":"delta"}
+{"content":" using","request_id":1,"type":"delta"}
+{"content":" text","request_id":1,"type":"delta"}
 {"content":".","request_id":1,"type":"delta"}
 {"content":" The","request_id":1,"type":"delta"}
 {"content":" sum","request_id":1,"type":"delta"}
@@ -54,17 +49,17 @@
 {"content":" ","request_id":1,"type":"delta"}
 {"content":"4","request_id":1,"type":"delta"}
 {"content":".","request_id":1,"type":"delta"}
-{"meta":{"id":"fdb975f1c4344d0bb14647eb1db2176d","model":"mistral-small"},"request_id":1,"status":"completed","type":"done"}
+{"meta":{"id":"b0698fbfc3684f548d9d06a7ede06546","model":"mistral-small"},"request_id":1,"status":"completed","type":"done"}
 {"meta":null,"request_id":1,"status":"completed","type":"done"}
 {"content":"I","request_id":2,"type":"delta"}
 {"content":"'","request_id":2,"type":"delta"}
 {"content":"m","request_id":2,"type":"delta"}
-{"content":" actually","request_id":2,"type":"delta"}
-{"content":" a","request_id":2,"type":"delta"}
+{"content":" an","request_id":2,"type":"delta"}
 {"content":" text","request_id":2,"type":"delta"}
 {"content":"-","request_id":2,"type":"delta"}
 {"content":"based","request_id":2,"type":"delta"}
 {"content":" AI","request_id":2,"type":"delta"}
+{"content":" model","request_id":2,"type":"delta"}
 {"content":" and","request_id":2,"type":"delta"}
 {"content":" don","request_id":2,"type":"delta"}
 {"content":"'","request_id":2,"type":"delta"}
@@ -77,28 +72,9 @@
 {"content":" external","request_id":2,"type":"delta"}
 {"content":" tools","request_id":2,"type":"delta"}
 {"content":" or","request_id":2,"type":"delta"}
-{"content":" view","request_id":2,"type":"delta"}
-{"content":" or","request_id":2,"type":"delta"}
-{"content":" manip","request_id":2,"type":"delta"}
-{"content":"ulate","request_id":2,"type":"delta"}
-{"content":" real","request_id":2,"type":"delta"}
-{"content":"-","request_id":2,"type":"delta"}
-{"content":"world","request_id":2,"type":"delta"}
-{"content":" objects","request_id":2,"type":"delta"}
-{"content":",","request_id":2,"type":"delta"}
-{"content":" so","request_id":2,"type":"delta"}
-{"content":" I","request_id":2,"type":"delta"}
-{"content":" can","request_id":2,"type":"delta"}
-{"content":"'","request_id":2,"type":"delta"}
-{"content":"t","request_id":2,"type":"delta"}
-{"content":" use","request_id":2,"type":"delta"}
-{"content":" a","request_id":2,"type":"delta"}
-{"content":" calcul","request_id":2,"type":"delta"}
-{"content":"ator","request_id":2,"type":"delta"}
-{"content":" to","request_id":2,"type":"delta"}
-{"content":" answer","request_id":2,"type":"delta"}
-{"content":" your","request_id":2,"type":"delta"}
-{"content":" question","request_id":2,"type":"delta"}
+{"content":" perform","request_id":2,"type":"delta"}
+{"content":" calculations","request_id":2,"type":"delta"}
+{"content":" directly","request_id":2,"type":"delta"}
 {"content":".","request_id":2,"type":"delta"}
 {"content":" However","request_id":2,"type":"delta"}
 {"content":",","request_id":2,"type":"delta"}
@@ -108,16 +84,20 @@
 {"content":" you","request_id":2,"type":"delta"}
 {"content":" that","request_id":2,"type":"delta"}
 {"content":" the","request_id":2,"type":"delta"}
-{"content":" sum","request_id":2,"type":"delta"}
-{"content":" of","request_id":2,"type":"delta"}
+{"content":" calculation","request_id":2,"type":"delta"}
+{"content":" you","request_id":2,"type":"delta"}
+{"content":" asked","request_id":2,"type":"delta"}
+{"content":" for","request_id":2,"type":"delta"}
+{"content":",","request_id":2,"type":"delta"}
 {"content":" ","request_id":2,"type":"delta"}
 {"content":"2","request_id":2,"type":"delta"}
-{"content":" and","request_id":2,"type":"delta"}
+{"content":" +","request_id":2,"type":"delta"}
 {"content":" ","request_id":2,"type":"delta"}
 {"content":"2","request_id":2,"type":"delta"}
-{"content":" is","request_id":2,"type":"delta"}
+{"content":",","request_id":2,"type":"delta"}
+{"content":" equals","request_id":2,"type":"delta"}
 {"content":" ","request_id":2,"type":"delta"}
 {"content":"4","request_id":2,"type":"delta"}
 {"content":".","request_id":2,"type":"delta"}
-{"meta":{"id":"eb9f60f2efcb410b8cc94d82978c83b1","model":"mistral-small"},"request_id":2,"status":"completed","type":"done"}
+{"meta":{"id":"c990498a963d4f809926ae19db59673a","model":"mistral-small"},"request_id":2,"status":"completed","type":"done"}
 {"meta":null,"request_id":2,"status":"completed","type":"done"}
