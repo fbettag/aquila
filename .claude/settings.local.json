@@ -1,25 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
-      "Bash(git log -1 --pretty=format:\"%h %s%n%n%b\")",
-      "Bash(mix test test/core/tool_test.exs)",
-      "Bash(mix quality)",
-      "Bash(mix format)",
-      "Bash(mix test test/integration/tool_compatibility_test.exs)",
-      "Bash(mix test --exclude live)",
-      "WebFetch(domain:docs.litellm.ai)",
-      "WebSearch",
-      "Bash(export OPENAI_API_KEY=\"sk-4RCYbJWtt-B2DiP1d_o0NA\")",
-      "Bash(export OPENAI_BASE_URL=\"https://api.2342.ai/v1\")",
-      "Bash(mix test)",
-      "Bash(cat test/support/fixtures/aquila_cassettes/tool_compat/openai_gpt_5_mini/custom_function.sse.jsonl)",
-      "Bash(cat test/support/fixtures/aquila_cassettes/tool_compat/openai_gpt_5_mini/custom_function.meta.jsonl)",
-      "Bash(timeout 180 mix test test/integration/tool_compatibility_test.exs --seed 0 --max-cases 1)"
+      "Bash(cat:*)",
+      "Bash(python3:*)",
+      "Bash(timeout:*)",
+      "Bash(mix:*)"
     ],
     "deny": [],
     "ask": []
+  },
+  "sandbox": {
+    "autoAllowBashIfSandboxed": true,
+    "enabled": true
   }
 }

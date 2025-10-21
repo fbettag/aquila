@@ -3,9 +3,9 @@
   "billing": {
     "payer": "developer"
   },
-  "created_at": 1760971450,
+  "created_at": 1761054906,
   "error": null,
-  "id": "resp_bGl0ZWxsbTpjdXN0b21fbGxtX3Byb3ZpZGVyOm9wZW5haTttb2RlbF9pZDo4ZjA1N2IyOTYzMGIzZDY1YzQyNmM3YWVmYjE4OTBkMzE5Y2U4OGE2NmFmMzY1NGUxNzc1NGIyN2I2Y2RjNmUxO3Jlc3BvbnNlX2lkOnJlc3BfMGU2OWI5NWI2MTIzNzhjMzAwNjhmNjRhYmFiYzhjODFhMThjNWJmMDlhZTI3NTdhMTA=",
+  "id": "resp_bGl0ZWxsbTpjdXN0b21fbGxtX3Byb3ZpZGVyOm9wZW5haTttb2RlbF9pZDo4ZjA1N2IyOTYzMGIzZDY1YzQyNmM3YWVmYjE4OTBkMzE5Y2U4OGE2NmFmMzY1NGUxNzc1NGIyN2I2Y2RjNmUxO3Jlc3BvbnNlX2lkOnJlc3BfMDAwZjA3MGY3ZjZiNTVhZDAwNjhmNzkwYmEzM2RjODFhMDhjN2YwYTY2ODA2YmFkYTY=",
   "incomplete_details": null,
   "instructions": "Keep it short",
   "max_output_tokens": null,
@@ -19,11 +19,11 @@
         {
           "annotations": [],
           "logprobs": [],
-          "text": "Hello! It's 2023.",
+          "text": "Hello! Today is 2023.",
           "type": "output_text"
         }
       ],
-      "id": "msg_0e69b95b612378c30068f64abd094c81a1a63040941c35686f",
+      "id": "msg_000f070f7f6b55ad0068f790bae98881a0a2728961935d898a",
       "role": "assistant",
       "status": "completed",
       "type": "message"
@@ -60,12 +60,12 @@
       "cached_tokens": 0,
       "text_tokens": null
     },
-    "output_tokens": 8,
+    "output_tokens": 9,
     "output_tokens_details": {
       "reasoning_tokens": 0,
       "text_tokens": null
     },
-    "total_tokens": 29
+    "total_tokens": 30
   },
   "user": null
 }

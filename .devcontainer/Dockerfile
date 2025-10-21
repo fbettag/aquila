@@ -2,7 +2,7 @@
 ARG VARIANT="1.18.4-otp-28"
 FROM elixir:${VARIANT}
 
-ARG PACKAGES="build-essential inotify-tools python3 postgresql-client curl xdg-utils qpdf watchman chromium-driver chromium fonts-noto-color-emoji fonts-noto-cjk"
+ARG PACKAGES="build-essential inotify-tools python3 postgresql-client curl xdg-utils qpdf watchman chromium-driver chromium fonts-noto-color-emoji fonts-noto-cjk socat"
 
 RUN apt-get update \
     && apt-get install -y $PACKAGES \

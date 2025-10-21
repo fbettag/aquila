@@ -1,0 +1,11 @@
+{"content":"1","request_id":1,"type":"delta"}
+{"content":",","request_id":1,"type":"delta"}
+{"content":" ","request_id":1,"type":"delta"}
+{"content":"2","request_id":1,"type":"delta"}
+{"content":",","request_id":1,"type":"delta"}
+{"content":" ","request_id":1,"type":"delta"}
+{"content":"3","request_id":1,"type":"delta"}
+{"content":".","request_id":1,"type":"delta"}
+{"meta":{"id":"chatcmpl-CT8As3W7ebuopVe9jqdfPlsE4sFQd","model":"gpt-4o-mini"},"request_id":1,"status":"completed","type":"done"}
+{"request_id":1,"type":"usage","usage":{"completion_tokens":8,"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":0,"rejected_prediction_tokens":0},"prompt_tokens":15,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"total_tokens":23}}
+{"meta":null,"request_id":1,"status":"completed","type":"done"}

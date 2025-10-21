@@ -1,0 +1,16 @@
+{"args_fragment":"","call_id":"call_BaW3nx5hlV3TD4DvLJhxAkqP","id":"call_BaW3nx5hlV3TD4DvLJhxAkqP","name":"calculator","request_id":1,"type":"tool_call"}
+{"args_fragment":"{\"","call_id":"call_BaW3nx5hlV3TD4DvLJhxAkqP","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"expression","call_id":"call_BaW3nx5hlV3TD4DvLJhxAkqP","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"\":\"","call_id":"call_BaW3nx5hlV3TD4DvLJhxAkqP","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"2","call_id":"call_BaW3nx5hlV3TD4DvLJhxAkqP","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"+","call_id":"call_BaW3nx5hlV3TD4DvLJhxAkqP","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"2","call_id":"call_BaW3nx5hlV3TD4DvLJhxAkqP","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"\"}","call_id":"call_BaW3nx5hlV3TD4DvLJhxAkqP","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args":{"expression":"2+2"},"call_id":"call_BaW3nx5hlV3TD4DvLJhxAkqP","id":"call_BaW3nx5hlV3TD4DvLJhxAkqP","name":"calculator","request_id":1,"type":"tool_call_end"}
+{"meta":{"id":"chatcmpl-CT77oO1AnzirKj8yiyh26yXYMIh1Y","model":"gpt-5","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
+{"request_id":1,"type":"usage","usage":{"completion_tokens":153,"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":128,"rejected_prediction_tokens":0},"prompt_tokens":169,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"total_tokens":322}}
+{"meta":null,"request_id":1,"status":"completed","type":"done"}
+{"content":"4","request_id":2,"type":"delta"}
+{"meta":{"id":"chatcmpl-CT77qZlU8Q5iszgjCVD1FT7S4lRSO","model":"gpt-5"},"request_id":2,"status":"completed","type":"done"}
+{"request_id":2,"type":"usage","usage":{"completion_tokens":4,"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":0,"rejected_prediction_tokens":0},"prompt_tokens":203,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"total_tokens":207}}
+{"meta":null,"request_id":2,"status":"completed","type":"done"}

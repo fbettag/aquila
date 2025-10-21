@@ -328,6 +328,48 @@ defmodule Aquila.Transport.OpenAI do
     [%{type: :done, status: :requires_action, meta: Map.delete(payload, "type")}]
   end
 
+  defp normalize_responses(%{"type" => "response.output_item.added", "item" => item} = payload)
+       when is_map(item) do
+    case Map.get(item, "type") do
+      "function_call" ->
+        [
+          %{
+            type: :tool_call,
+            id: item["call_id"],
+            name: item["name"],
+            args_fragment: "",
+            call_id: item["call_id"]
+          },
+          %{type: :event, payload: deep_research_payload(payload)}
+        ]
+
+      _ ->
+        [%{type: :event, payload: deep_research_payload(payload)}]
+    end
+  end
+
+  defp normalize_responses(%{"type" => "response.output_item.done", "item" => item} = payload)
+       when is_map(item) do
+    case Map.get(item, "type") do
+      "function_call" ->
+        args = decode_json_map(item["arguments"] || "{}")
+
+        [
+          %{
+            type: :tool_call_end,
+            id: item["call_id"],
+            name: item["name"],
+            args: args,
+            call_id: item["call_id"]
+          },
+          %{type: :event, payload: deep_research_payload(payload)}
+        ]
+
+      _ ->
+        [%{type: :event, payload: deep_research_payload(payload)}]
+    end
+  end
+
   defp normalize_responses(%{"type" => "response.in_progress"} = payload) do
     [%{type: :event, payload: deep_research_payload(payload)}]
   end

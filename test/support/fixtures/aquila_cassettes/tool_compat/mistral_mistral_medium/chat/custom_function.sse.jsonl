@@ -1,0 +1,11 @@
+{"args_fragment":"{\"expression\": \"2+2\"}","call_id":"ptTLdlLc8","id":"ptTLdlLc8","name":"calculator","request_id":1,"type":"tool_call"}
+{"args":{"expression":"2+2"},"call_id":"ptTLdlLc8","id":"ptTLdlLc8","name":"calculator","request_id":1,"type":"tool_call_end"}
+{"meta":{"id":"e160166ee00b4430973df11d378c8a9f","model":"mistral-medium","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
+{"meta":null,"request_id":1,"status":"completed","type":"done"}
+{"content":"The","request_id":2,"type":"delta"}
+{"content":" result of","request_id":2,"type":"delta"}
+{"content":" \\(2 + ","request_id":2,"type":"delta"}
+{"content":"2\\) is **","request_id":2,"type":"delta"}
+{"content":"4**.","request_id":2,"type":"delta"}
+{"meta":{"id":"279b6135907f4887b34a80cc72e4ee69","model":"mistral-medium"},"request_id":2,"status":"completed","type":"done"}
+{"meta":null,"request_id":2,"status":"completed","type":"done"}

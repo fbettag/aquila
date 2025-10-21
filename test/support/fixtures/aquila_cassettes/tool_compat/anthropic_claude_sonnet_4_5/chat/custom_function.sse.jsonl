@@ -1,0 +1,16 @@
+{"content":"","request_id":1,"type":"delta"}
+{"args_fragment":"","call_id":"toolu_01QwYh49W6Q4yq3NQajeWRCK","id":"toolu_01QwYh49W6Q4yq3NQajeWRCK","name":"calculator","request_id":1,"type":"tool_call"}
+{"content":"","request_id":1,"type":"delta"}
+{"args_fragment":"","call_id":"toolu_01QwYh49W6Q4yq3NQajeWRCK","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"content":"","request_id":1,"type":"delta"}
+{"args_fragment":"{\"expressi","call_id":"toolu_01QwYh49W6Q4yq3NQajeWRCK","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"content":"","request_id":1,"type":"delta"}
+{"args_fragment":"on\": \"2+2\"}","call_id":"toolu_01QwYh49W6Q4yq3NQajeWRCK","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args":{"expression":"2+2"},"call_id":"toolu_01QwYh49W6Q4yq3NQajeWRCK","id":"toolu_01QwYh49W6Q4yq3NQajeWRCK","name":"calculator","request_id":1,"type":"tool_call_end"}
+{"meta":{"id":"chatcmpl-0fe71cc8-c3a3-4d89-ad90-4e8fd1da586a","model":"claude-sonnet-4-5","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
+{"meta":null,"request_id":1,"status":"completed","type":"done"}
+{"content":"The","request_id":2,"type":"delta"}
+{"content":" result of 2+2 is **","request_id":2,"type":"delta"}
+{"content":"4**.","request_id":2,"type":"delta"}
+{"meta":{"id":"chatcmpl-dd010935-9e0a-4bd0-b556-10e721f944b6","model":"claude-sonnet-4-5"},"request_id":2,"status":"completed","type":"done"}
+{"meta":null,"request_id":2,"status":"completed","type":"done"}

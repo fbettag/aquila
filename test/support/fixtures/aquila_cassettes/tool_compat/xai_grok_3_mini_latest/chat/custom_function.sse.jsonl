@@ -1,0 +1,16 @@
+{"args_fragment":"{\"expression\":\"2+2\"}","call_id":"call_35464504","id":"call_35464504","name":"calculator","request_id":1,"type":"tool_call"}
+{"args":{"expression":"2+2"},"call_id":"call_35464504","id":"call_35464504","name":"calculator","request_id":1,"type":"tool_call_end"}
+{"meta":{"id":"62b96f64-1c40-6ada-2476-6b7ebe3b1b71_us-east-1","model":"grok-3-mini-latest","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
+{"meta":null,"request_id":1,"status":"completed","type":"done"}
+{"content":"The","request_id":2,"type":"delta"}
+{"content":" calculator","request_id":2,"type":"delta"}
+{"content":" tool","request_id":2,"type":"delta"}
+{"content":" returned","request_id":2,"type":"delta"}
+{"content":" the","request_id":2,"type":"delta"}
+{"content":" result","request_id":2,"type":"delta"}
+{"content":":","request_id":2,"type":"delta"}
+{"content":" ","request_id":2,"type":"delta"}
+{"content":"4","request_id":2,"type":"delta"}
+{"content":".","request_id":2,"type":"delta"}
+{"meta":{"id":"847c1fb3-ce91-d9e8-9e09-4a584149115c_us-east-1","model":"grok-3-mini-latest"},"request_id":2,"status":"completed","type":"done"}
+{"meta":null,"request_id":2,"status":"completed","type":"done"}

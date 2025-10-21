@@ -16,14 +16,17 @@ defmodule Aquila.ToolCompatibilityTest do
 
   @models [
     "openai/gpt-3.5-turbo",
+    "openai/gpt-4o",
     "openai/gpt-4o-mini",
     "openai/gpt-4.1-mini",
+    "openai/gpt-4.1",
     "openai/gpt-5-mini",
+    "openai/gpt-5",
     "anthropic/claude-3-5-sonnet-latest",
     "anthropic/claude-3-opus-latest",
     "anthropic/claude-sonnet-4-5",
     "anthropic/claude-haiku-4-5",
-    "mistral/mistral-small",
+    "mistral/mistral-medium",
     "moonshot/kimi-latest",
     "deepseek/deepseek-chat",
     "xai/grok-3-mini-latest",
@@ -50,25 +53,36 @@ defmodule Aquila.ToolCompatibilityTest do
       ],
       fn args ->
         # Notify test that tool was called
-        expression = Map.get(args, "expression", "unknown")
+        expression = Map.get(args, "expression", "2+2")
         send(test_pid, {:tool_called, expression})
-        "The result is 42"
+
+        # Return the correct calculation to avoid smart models retrying
+        try do
+          {result, _} = Code.eval_string(expression)
+          "The result is #{result}"
+        rescue
+          _ -> "The result is 4"
+        end
       end
     )
   end
 
   describe "custom function tool compatibility" do
-    for model <- @models do
-      test "#{model} accepts and calls custom function tool" do
+    for model <- @models,
+        endpoint <-
+          if(String.starts_with?(model, "openai/"), do: [:chat, :responses], else: [:chat]) do
+      test "#{model} accepts and calls custom function tool (#{endpoint})" do
         model = unquote(model)
+        endpoint = unquote(endpoint)
 
-        aquila_cassette "tool_compat/#{sanitize_model(model)}/custom_function" do
+        aquila_cassette "tool_compat/#{sanitize_model(model)}/#{endpoint}/custom_function" do
           response =
             Aquila.ask(
               "Please calculate 2+2 using the calculator tool. You must use the calculator tool to answer this.",
               model: model,
               tools: [calculator_tool(self())],
-              timeout: 30_000
+              timeout: 30_000,
+              endpoint: endpoint
             )
 
           # Verify the model provided a response

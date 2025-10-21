@@ -1,0 +1,8 @@
+{"content":"Your","request_id":1,"type":"delta"}
+{"content":" name","request_id":1,"type":"delta"}
+{"content":" is","request_id":1,"type":"delta"}
+{"content":" Alice","request_id":1,"type":"delta"}
+{"content":".","request_id":1,"type":"delta"}
+{"meta":{"id":"chatcmpl-CT8AvhJzA7NgDIJIJw6YNWsciKqyx","model":"gpt-4o-mini"},"request_id":1,"status":"completed","type":"done"}
+{"request_id":1,"type":"usage","usage":{"completion_tokens":5,"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":0,"rejected_prediction_tokens":0},"prompt_tokens":32,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"total_tokens":37}}
+{"meta":null,"request_id":1,"status":"completed","type":"done"}
