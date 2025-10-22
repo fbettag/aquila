@@ -109,7 +109,8 @@ defmodule Aquila.StreamSession do
           model: assistant.model,
           temperature: assistant.temperature,
           tool_context: assistant.context,
-          timeout: timeout
+          timeout: timeout,
+          endpoint: assistant.endpoint
         ],
         assistant.reasoning
       )

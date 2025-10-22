@@ -1259,7 +1259,7 @@ defmodule Aquila.Engine do
     # Check if any of these signatures appear 2+ times in recent history (indicating loop)
     Enum.find_value(new_signatures, :no_loop, fn signature ->
       recent_count = Enum.count(Enum.take(history, 8), &(&1 == signature))
-      if recent_count >= 1, do: {:loop_detected, signature}, else: nil
+      if recent_count >= 2, do: {:loop_detected, signature}, else: nil
     end)
   end
 

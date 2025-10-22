@@ -1,0 +1,5 @@
+{"id":"resp_stub","request_id":1,"type":"response_ref"}
+{"content":"Hello","request_id":1,"type":"delta"}
+{"content":" from Responses","request_id":1,"type":"delta"}
+{"request_id":1,"type":"usage","usage":{"total_tokens":5}}
+{"meta":{"usage":{"total_tokens":5}},"request_id":1,"status":"completed","type":"done"}

@@ -86,6 +86,15 @@ defmodule Aquila.AssistantTest do
 
       assert assistant.model == "gpt-4o"
     end
+
+    test "keeps manual endpoint override when model changes" do
+      assistant =
+        Assistant.new()
+        |> Assistant.with_endpoint(:chat)
+        |> Assistant.with_model("gpt-4o")
+
+      assert assistant.endpoint == :chat
+    end
   end
 
   describe "with_temperature/2" do
@@ -119,6 +128,16 @@ defmodule Aquila.AssistantTest do
         |> Assistant.with_messages(messages)
 
       assert assistant.messages == messages
+    end
+  end
+
+  describe "with_endpoint/2" do
+    test "sets endpoint" do
+      assistant =
+        Assistant.new()
+        |> Assistant.with_endpoint(:responses)
+
+      assert assistant.endpoint == :responses
     end
   end
 

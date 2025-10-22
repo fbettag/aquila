@@ -25,9 +25,4 @@ defmodule Aquila.EndpointTest do
       assert Endpoint.default(base_url: "https://example.com/v1", model: :unknown) == :chat
     end
   end
-
-  test "responses_model?/1 strips -latest" do
-    assert Endpoint.responses_model?("gpt-4o-latest")
-    refute Endpoint.responses_model?("gpt-3.5-turbo")
-  end
 end

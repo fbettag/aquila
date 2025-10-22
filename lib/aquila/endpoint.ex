@@ -7,8 +7,6 @@ defmodule Aquila.Endpoint do
   defaults to the Chat Completions endpoint.
   """
 
-  @responses_models ~w(gpt-4o gpt-4.1 gpt-4.1-mini gpt-4.1-nano)a
-
   @type endpoint :: :responses | :chat
 
   @doc """
@@ -35,11 +33,4 @@ defmodule Aquila.Endpoint do
   """
   @spec default(keyword()) :: endpoint()
   def default(_opts), do: :chat
-
-  @doc false
-  @spec responses_model?(String.t()) :: boolean()
-  def responses_model?(model) when is_binary(model) do
-    cleaned = String.replace(model, ~r/-latest$/, "")
-    cleaned in Enum.map(@responses_models, &to_string/1)
-  end
 end
