@@ -993,16 +993,22 @@ defmodule Aquila.Engine do
   defp build_response(%State{} = state) do
     chunks_text = final_text(state)
 
+    # Extract _fallback_text BEFORE adding messages to preserve it
+    # Try both atom and string keys since cassettes use strings
+    {fallback_text, final_meta_without_fallback} =
+      case Map.pop(state.final_meta, :_fallback_text) do
+        {nil, meta} -> Map.pop(meta, "_fallback_text")
+        result -> result
+      end
+
     meta =
-      state.final_meta
+      final_meta_without_fallback
       |> Map.put(:model, state.model)
       |> Map.put(:endpoint, state.endpoint)
       |> Map.put(:status, state.status)
       |> maybe_put_usage(state.usage)
       |> Map.put(:messages, Message.to_list(state.messages))
       |> maybe_put(:response_id, state.response_id)
-
-    {fallback_text, meta} = Map.pop(meta, :_fallback_text)
 
     {text, meta} = resolve_text(chunks_text, fallback_text, meta, state)
 
@@ -1560,8 +1566,8 @@ defmodule Aquila.Engine do
         raw_events: [],
         pending_calls: [],
         status: :in_progress,
-        final_meta: %{},
-        usage: %{},
+        # Preserve final_meta and usage since they contain cumulative data from previous rounds
+        # (e.g. _fallback_text from deep research, usage stats, response_id)
         tool_payloads: [],
         last_tool_outputs: [],
         tool_call_history: []
