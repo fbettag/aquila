@@ -391,7 +391,8 @@ defmodule Aquila.Engine.Shared do
     end
   end
 
-  defp do_detect_tool_loop(history, ready_calls) do
+  @doc false
+  def do_detect_tool_loop(history, ready_calls) do
     # Get signatures of calls we're about to make
     new_signatures = Enum.map(ready_calls, fn call -> {call.name, call.args} end)
 
@@ -592,7 +593,8 @@ defmodule Aquila.Engine.Shared do
   defp extract_error_message(_), do: ""
 
   # Checks if error message indicates a specific role is not supported
-  defp role_not_supported?(message, role) do
+  @doc false
+  def role_not_supported?(message, role) do
     cond do
       # Generic patterns for both roles
       String.contains?(message, "'#{role}'") and String.contains?(message, "does not support") ->
@@ -628,6 +630,29 @@ defmodule Aquila.Engine.Shared do
 
       true ->
         false
+    end
+  end
+
+  @doc false
+  def extract_tool_call_args(call) do
+    cond do
+      is_map(call[:args]) and map_size(call[:args]) > 0 ->
+        call.args
+
+      is_binary(call[:args_fragment]) ->
+        fragment = String.trim(call.args_fragment)
+
+        if fragment != "" and fragment != "{}" do
+          case Jason.decode(fragment) do
+            {:ok, decoded} when is_map(decoded) -> decoded
+            _ -> %{}
+          end
+        else
+          %{}
+        end
+
+      true ->
+        %{}
     end
   end
 

@@ -177,20 +177,44 @@ defmodule Aquila.Engine.Responses do
     }
   end
 
+  # Handle content parts (list of maps) - pass through directly
   defp message_to_response(%Message{role: role, content: content})
-       when is_binary(content) or is_list(content) do
+       when is_list(content) do
+    if content_parts?(content) do
+      %{
+        role: Atom.to_string(role),
+        content: content
+      }
+    else
+      # iodata - convert to single text part
+      %{
+        role: Atom.to_string(role),
+        content: [response_text_part(role, content)]
+      }
+    end
+  end
+
+  # Handle binary content
+  defp message_to_response(%Message{role: role, content: content})
+       when is_binary(content) do
     %{
       role: Atom.to_string(role),
       content: [response_text_part(role, content)]
     }
   end
 
+  # Handle single content part map
   defp message_to_response(%Message{role: role, content: content}) when is_map(content) do
     %{
       role: Atom.to_string(role),
       content: [content]
     }
   end
+
+  # Helper to detect if list contains content parts (maps) vs iodata (strings/binaries)
+  defp content_parts?([]), do: false
+  defp content_parts?([%{} | _]), do: true
+  defp content_parts?(_), do: false
 
   defp response_text_part(role, content) do
     type =

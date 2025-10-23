@@ -766,28 +766,6 @@ defmodule Aquila.Engine do
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
-  defp extract_tool_call_args(call) do
-    cond do
-      is_map(call[:args]) and map_size(call[:args]) > 0 ->
-        call.args
-
-      is_binary(call[:args_fragment]) ->
-        fragment = String.trim(call.args_fragment)
-
-        if fragment != "" and fragment != "{}" do
-          case Jason.decode(fragment) do
-            {:ok, decoded} when is_map(decoded) -> decoded
-            _ -> %{}
-          end
-        else
-          %{}
-        end
-
-      true ->
-        %{}
-    end
-  end
-
   defp handle_tool_loop_detected(%State{} = state, ready_calls, pending_calls, call_signature) do
     {tool_name, tool_args} = call_signature
 
@@ -805,7 +783,7 @@ defmodule Aquila.Engine do
         {state.messages, state.tool_context, [], state.tool_call_history},
         fn call, {msgs, ctx, outputs, history} ->
           msgs_with_call = endpoint_impl.maybe_append_assistant_tool_call(state, msgs, call)
-          args = extract_tool_call_args(call)
+          args = Shared.extract_tool_call_args(call)
 
           Sink.notify(
             state.sink,
@@ -888,19 +866,8 @@ defmodule Aquila.Engine do
     if loop_detection_disabled?(context) do
       :no_loop
     else
-      do_detect_tool_loop(history, ready_calls)
+      Shared.do_detect_tool_loop(history, ready_calls)
     end
-  end
-
-  defp do_detect_tool_loop(history, ready_calls) do
-    # Get signatures of calls we're about to make
-    new_signatures = Enum.map(ready_calls, fn call -> {call.name, call.args} end)
-
-    # Check if any of these signatures appear 2+ times in recent history (indicating loop)
-    Enum.find_value(new_signatures, :no_loop, fn signature ->
-      recent_count = Enum.count(Enum.take(history, 8), &(&1 == signature))
-      if recent_count >= 2, do: {:loop_detected, signature}, else: nil
-    end)
   end
 
   defp loop_detection_disabled?(context) when is_map(context) do
@@ -1067,14 +1034,14 @@ defmodule Aquila.Engine do
 
     cond do
       # Error indicates 'tool' role is not supported and we haven't tried function role yet
-      role_not_supported?(error_message, "tool") and state.supports_tool_role != false ->
+      Shared.role_not_supported?(error_message, "tool") and state.supports_tool_role != false ->
         Logger.debug("Model does not support 'tool' role, switching to 'function' role")
         endpoint_impl = get_endpoint_impl(state)
         new_state = endpoint_impl.rebuild_tool_messages_for_retry(state, {:role, false})
         {:retry, new_state}
 
       # Error indicates 'function' role is not supported and we haven't tried tool role yet
-      role_not_supported?(error_message, "function") and state.supports_tool_role != true ->
+      Shared.role_not_supported?(error_message, "function") and state.supports_tool_role != true ->
         Logger.debug("Model does not support 'function' role, switching to 'tool' role")
         endpoint_impl = get_endpoint_impl(state)
         new_state = endpoint_impl.rebuild_tool_messages_for_retry(state, {:role, true})
@@ -1097,46 +1064,6 @@ defmodule Aquila.Engine do
   defp extract_error_message(%{message: msg}) when is_binary(msg), do: msg
   defp extract_error_message(error) when is_binary(error), do: error
   defp extract_error_message(_), do: ""
-
-  # Checks if error message indicates a specific role is not supported
-  defp role_not_supported?(message, role) do
-    cond do
-      # Generic patterns for both roles
-      String.contains?(message, "'#{role}'") and String.contains?(message, "does not support") ->
-        true
-
-      String.contains?(message, "Unsupported value") ->
-        true
-
-      String.contains?(message, "unknown variant `#{role}`") ->
-        true
-
-      # Tool role specific errors
-      role == "tool" and String.contains?(message, "unexpected `tool_use_id`") ->
-        true
-
-      role == "tool" and
-          (String.contains?(
-             message,
-             "must be a response to a preceeding message with 'tool_calls'"
-           ) or
-             String.contains?(
-               message,
-               "must be a response to a preceding message with 'tool_calls'"
-             )) ->
-        true
-
-      # Function role specific errors
-      role == "function" and String.contains?(message, "unsupported role ROLE_FUNCTION") ->
-        true
-
-      role == "function" and String.contains?(message, "unknown role ROLE_FUNCTION") ->
-        true
-
-      true ->
-        false
-    end
-  end
 
   defp requires_structured_tool_result?(message) do
     String.contains?(message, "unexpected `tool_use_id`") or

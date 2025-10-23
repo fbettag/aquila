@@ -152,7 +152,7 @@ defmodule Aquila.Engine.Chat do
           false
       end)
 
-    args_map = extract_tool_call_args(call)
+    args_map = Shared.extract_tool_call_args(call)
 
     if already_present do
       messages
@@ -177,28 +177,6 @@ defmodule Aquila.Engine.Chat do
   defp encode_tool_arguments(arguments) when is_binary(arguments), do: arguments
   defp encode_tool_arguments(arguments) when is_map(arguments), do: Jason.encode!(arguments)
   defp encode_tool_arguments(_), do: "{}"
-
-  defp extract_tool_call_args(call) do
-    cond do
-      is_map(call[:args]) and map_size(call[:args]) > 0 ->
-        call.args
-
-      is_binary(call[:args_fragment]) ->
-        fragment = String.trim(call.args_fragment)
-
-        if fragment != "" and fragment != "{}" do
-          case Jason.decode(fragment) do
-            {:ok, decoded} when is_map(decoded) -> decoded
-            _ -> %{}
-          end
-        else
-          %{}
-        end
-
-      true ->
-        %{}
-    end
-  end
 
   # Rebuilds messages with a different tool role format after detecting incompatibility.
   # This removes tool output messages and recreates them with the specified role format.

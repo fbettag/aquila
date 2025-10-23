@@ -159,4 +159,53 @@ defmodule Aquila.ResponsesHelperTest do
     assert Map.get(body, :store) == nil
     assert Map.get(body, "store") == nil
   end
+
+  test "Aquila.ask with responses endpoint handles multipart content (content parts)" do
+    alias Aquila.Message
+
+    # Create a message with multiple content parts, similar to file upload scenario
+    messages = [
+      Message.new(:user, [
+        %{type: "text", text: "What text is in the file I just uploaded?"},
+        %{type: "text", text: "PDF content from test_file.pdf:\n\nCassian Andor\n\f"}
+      ])
+    ]
+
+    response =
+      Aquila.ask(messages,
+        model: "openai/gpt-4o",
+        endpoint: :responses,
+        transport: Aquila.CaptureTransport
+      )
+
+    assert response.text == ""
+
+    assert_receive {:stream_request, req}
+
+    body = Map.get(req, :body) || Map.get(req, "body")
+    input = Map.get(body, :input) || Map.get(body, "input")
+
+    # Verify the input contains our message with content parts
+    assert is_list(input)
+    assert length(input) == 1
+
+    [message] = input
+    content = Map.get(message, :content) || Map.get(message, "content")
+
+    # Content should be a list of content parts, NOT wrapped in another list
+    assert is_list(content)
+    assert length(content) == 2
+
+    # Verify both content parts are present
+    [part1, part2] = content
+    assert is_map(part1)
+    assert is_map(part2)
+
+    # Content parts should be passed through as-is
+    text1 = Map.get(part1, :text) || Map.get(part1, "text")
+    text2 = Map.get(part2, :text) || Map.get(part2, "text")
+
+    assert text1 == "What text is in the file I just uploaded?"
+    assert text2 == "PDF content from test_file.pdf:\n\nCassian Andor\n\f"
+  end
 end
