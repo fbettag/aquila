@@ -1,13 +1,13 @@
-{"args_fragment":"","call_id":"call_KbHQF3I0uJWHOmVvoAzPPx0U","id":"call_KbHQF3I0uJWHOmVvoAzPPx0U","name":"calculator","request_id":1,"type":"tool_call"}
-{"args_fragment":"{\"","call_id":"call_KbHQF3I0uJWHOmVvoAzPPx0U","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"expression","call_id":"call_KbHQF3I0uJWHOmVvoAzPPx0U","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"\":\"","call_id":"call_KbHQF3I0uJWHOmVvoAzPPx0U","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"2","call_id":"call_KbHQF3I0uJWHOmVvoAzPPx0U","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"+","call_id":"call_KbHQF3I0uJWHOmVvoAzPPx0U","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"2","call_id":"call_KbHQF3I0uJWHOmVvoAzPPx0U","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"\"}","call_id":"call_KbHQF3I0uJWHOmVvoAzPPx0U","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args":{"expression":"2+2"},"call_id":"call_KbHQF3I0uJWHOmVvoAzPPx0U","id":"call_KbHQF3I0uJWHOmVvoAzPPx0U","name":"calculator","request_id":1,"type":"tool_call_end"}
-{"meta":{"id":"chatcmpl-CTqyEfJmeHhzcCetUzQHlN9jNMNc8","model":"gpt-4.1-mini-2025-04-14","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
+{"args_fragment":"","call_id":"call_OJ15Mw3syM8c62GBKGSUJjIR","id":"call_OJ15Mw3syM8c62GBKGSUJjIR","name":"calculator","request_id":1,"type":"tool_call"}
+{"args_fragment":"{\"","call_id":"call_OJ15Mw3syM8c62GBKGSUJjIR","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"expression","call_id":"call_OJ15Mw3syM8c62GBKGSUJjIR","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"\":\"","call_id":"call_OJ15Mw3syM8c62GBKGSUJjIR","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"2","call_id":"call_OJ15Mw3syM8c62GBKGSUJjIR","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"+","call_id":"call_OJ15Mw3syM8c62GBKGSUJjIR","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"2","call_id":"call_OJ15Mw3syM8c62GBKGSUJjIR","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"\"}","call_id":"call_OJ15Mw3syM8c62GBKGSUJjIR","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args":{"expression":"2+2"},"call_id":"call_OJ15Mw3syM8c62GBKGSUJjIR","id":"call_OJ15Mw3syM8c62GBKGSUJjIR","name":"calculator","request_id":1,"type":"tool_call_end"}
+{"meta":{"id":"chatcmpl-CTt8i8sVjeUCwbEFaHLpIjF0Cu5Lp","model":"gpt-4.1-mini-2025-04-14","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
 {"meta":null,"request_id":1,"status":"completed","type":"done"}
 {"content":"","request_id":2,"type":"delta"}
 {"content":"The","request_id":2,"type":"delta"}
@@ -21,5 +21,5 @@
 {"content":" ","request_id":2,"type":"delta"}
 {"content":"4","request_id":2,"type":"delta"}
 {"content":".","request_id":2,"type":"delta"}
-{"meta":{"id":"chatcmpl-CTqyF6YvpGhCHTlIakECwTz5zdUzY","model":"gpt-4.1-mini-2025-04-14"},"request_id":2,"status":"completed","type":"done"}
+{"meta":{"id":"chatcmpl-CTt8jVZZnJyr28euYL2lKRpLkGlXg","model":"gpt-4.1-mini-2025-04-14"},"request_id":2,"status":"completed","type":"done"}
 {"meta":null,"request_id":2,"status":"completed","type":"done"}

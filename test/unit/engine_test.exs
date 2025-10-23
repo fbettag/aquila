@@ -327,6 +327,60 @@ defmodule Aquila.EngineTest do
     end
   end
 
+  defmodule LoopTransport do
+    @behaviour Aquila.Transport
+
+    @impl true
+    def post(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def get(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def delete(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def stream(req, callback) do
+      round = Process.get(:loop_round, 0)
+      Process.put(:loop_round, round + 1)
+
+      requests = Process.get(:loop_requests, [])
+      Process.put(:loop_requests, [req | requests])
+
+      args = %{"search_term" => "Battery storage system"}
+      call_suffix = round + 1
+      call_id = "crm-search-#{call_suffix}"
+
+      cond do
+        round <= 2 ->
+          callback.(%{
+            type: :tool_call,
+            id: "call-#{call_suffix}",
+            name: "crm_search_products",
+            args_fragment: Jason.encode!(args),
+            call_id: call_id
+          })
+
+          callback.(%{
+            type: :tool_call_end,
+            id: "call-#{call_suffix}",
+            args: args,
+            call_id: call_id
+          })
+
+          callback.(%{type: :done, status: :requires_action})
+          {:ok, make_ref()}
+
+        true ->
+          # Record the request that includes the loop prevention payload
+          Process.put(:loop_final_request, req)
+          callback.(%{type: :delta, content: "Done"})
+          callback.(%{type: :done, status: :completed})
+          {:ok, make_ref()}
+      end
+    end
+  end
+
   defmodule RoundRobinTransport do
     @behaviour Aquila.Transport
 
@@ -680,6 +734,74 @@ defmodule Aquila.EngineTest do
 
     assert_receive {:aquila_done, "Recovered", meta, ^ref}, 200
     assert meta[:status] == :completed
+  end
+
+  describe "tool loop detection" do
+    setup do
+      cleanup = fn ->
+        Process.delete(:loop_round)
+        Process.delete(:loop_requests)
+        Process.delete(:loop_final_request)
+        Process.delete(:loop_tool_invocations)
+      end
+
+      cleanup.()
+      on_exit(cleanup)
+      :ok
+    end
+
+    test "blocks repeated tool calls without raising" do
+      Process.put(:loop_tool_invocations, 0)
+
+      tool =
+        Tool.new(
+          "crm_search_products",
+          [
+            description: "Looks up products in a CRM data store.",
+            parameters: %{
+              "type" => "object",
+              "properties" => %{
+                "search_term" => %{
+                  "type" => "string",
+                  "description" => "Product name to look up."
+                }
+              },
+              "required" => ["search_term"]
+            }
+          ],
+          fn args, _ctx ->
+            count = Process.get(:loop_tool_invocations, 0)
+            Process.put(:loop_tool_invocations, count + 1)
+            term = Map.get(args, "search_term", "unknown item")
+            {:ok, "Found results for #{term}"}
+          end
+        )
+
+      response =
+        Engine.run("Find a battery storage system",
+          transport: LoopTransport,
+          tools: [tool],
+          endpoint: :responses,
+          base_url: "https://api.openai.com/v1/responses"
+        )
+
+      assert response.text == "Done"
+      assert Process.get(:loop_tool_invocations) == 2
+
+      final_request = Process.get(:loop_final_request)
+      assert final_request
+
+      body = Map.get(final_request, :body) || Map.get(final_request, "body") || %{}
+      input_items = Map.get(body, :input) || Map.get(body, "input") || []
+
+      assert Enum.any?(input_items, fn item ->
+               type = Map.get(item, :type) || Map.get(item, "type")
+               output = Map.get(item, :output) || Map.get(item, "output") || ""
+               type == "function_call_output" and String.contains?(output, "Tool loop detected")
+             end)
+
+      assert Process.get(:loop_round) >= 4
+    end
   end
 
   # Test removed: retry logic was intentionally removed for simplification

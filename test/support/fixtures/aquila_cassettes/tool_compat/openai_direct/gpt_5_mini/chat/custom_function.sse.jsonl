@@ -1,15 +1,21 @@
-{"args_fragment":"","call_id":"call_IWyY4vgleANrRGlbM6O5u6NL","id":"call_IWyY4vgleANrRGlbM6O5u6NL","name":"calculator","request_id":1,"type":"tool_call"}
-{"args_fragment":"{\"","call_id":"call_IWyY4vgleANrRGlbM6O5u6NL","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"expression","call_id":"call_IWyY4vgleANrRGlbM6O5u6NL","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"\":\"","call_id":"call_IWyY4vgleANrRGlbM6O5u6NL","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"2","call_id":"call_IWyY4vgleANrRGlbM6O5u6NL","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"+","call_id":"call_IWyY4vgleANrRGlbM6O5u6NL","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"2","call_id":"call_IWyY4vgleANrRGlbM6O5u6NL","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"\"}","call_id":"call_IWyY4vgleANrRGlbM6O5u6NL","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args":{"expression":"2+2"},"call_id":"call_IWyY4vgleANrRGlbM6O5u6NL","id":"call_IWyY4vgleANrRGlbM6O5u6NL","name":"calculator","request_id":1,"type":"tool_call_end"}
-{"meta":{"id":"chatcmpl-CTr1HhMHVjrrrCUy6k2Oyx5F1lQaW","model":"gpt-5-mini-2025-08-07","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
+{"args_fragment":"","call_id":"call_nhgxfn2tIElwWK2s8zmXP4EJ","id":"call_nhgxfn2tIElwWK2s8zmXP4EJ","name":"calculator","request_id":1,"type":"tool_call"}
+{"args_fragment":"{\"","call_id":"call_nhgxfn2tIElwWK2s8zmXP4EJ","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"expression","call_id":"call_nhgxfn2tIElwWK2s8zmXP4EJ","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"\":\"","call_id":"call_nhgxfn2tIElwWK2s8zmXP4EJ","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"2","call_id":"call_nhgxfn2tIElwWK2s8zmXP4EJ","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"+","call_id":"call_nhgxfn2tIElwWK2s8zmXP4EJ","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"2","call_id":"call_nhgxfn2tIElwWK2s8zmXP4EJ","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"\"}","call_id":"call_nhgxfn2tIElwWK2s8zmXP4EJ","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args":{"expression":"2+2"},"call_id":"call_nhgxfn2tIElwWK2s8zmXP4EJ","id":"call_nhgxfn2tIElwWK2s8zmXP4EJ","name":"calculator","request_id":1,"type":"tool_call_end"}
+{"meta":{"id":"chatcmpl-CTt8Acn8CxkF8D2Dwmilmhh4t6WS4","model":"gpt-5-mini-2025-08-07","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
 {"meta":null,"request_id":1,"status":"completed","type":"done"}
 {"content":"","request_id":2,"type":"delta"}
+{"content":"2","request_id":2,"type":"delta"}
+{"content":" +","request_id":2,"type":"delta"}
+{"content":" ","request_id":2,"type":"delta"}
+{"content":"2","request_id":2,"type":"delta"}
+{"content":" =","request_id":2,"type":"delta"}
+{"content":" ","request_id":2,"type":"delta"}
 {"content":"4","request_id":2,"type":"delta"}
-{"meta":{"id":"chatcmpl-CTr1JwlE5HNSh9YfmDxTR0J0mKqaE","model":"gpt-5-mini-2025-08-07"},"request_id":2,"status":"completed","type":"done"}
+{"meta":{"id":"chatcmpl-CTt8CRXGlbIEE4IaegUQJ7VLc6LtY","model":"gpt-5-mini-2025-08-07"},"request_id":2,"status":"completed","type":"done"}
 {"meta":null,"request_id":2,"status":"completed","type":"done"}

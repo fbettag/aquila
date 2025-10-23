@@ -197,6 +197,70 @@ chat_history =
   )
 ```
 
+## Multi-Turn Conversations with Tools
+
+When building chatbots or multi-turn conversations that use tools, you need to
+maintain the conversation history including tool invocations and results. The
+approach differs between the Chat Completions and Responses API.
+
+### Chat Completions Endpoint
+
+For the Chat Completions API (`:chat`), use `response.meta[:messages]` to get
+the complete message history including assistant tool calls and tool result
+messages:
+
+```elixir
+# First turn - user asks a question that requires a tool
+response1 = Aquila.ask(
+  "Calculate 8+9 using the calculator tool.",
+  endpoint: :chat,
+  tools: [calculator_tool]
+)
+
+# response1.text contains the final answer: "The result is 17"
+# response1.meta[:messages] contains the FULL conversation including:
+# - User message
+# - Assistant message with tool_calls
+# - Tool result message
+
+# Second turn - continue the conversation
+messages = response1.meta[:messages] ++
+  [%{role: :user, content: "Now multiply that by 2"}]
+
+response2 = Aquila.ask(messages, endpoint: :chat, tools: [calculator_tool])
+```
+
+**Important:** Do NOT manually construct the conversation history with just
+`{:user, ...}, {:assistant, response.text}, {:user, ...}`. This omits the tool
+call and tool result messages, causing the model to lose context and potentially
+re-execute the same tools.
+
+### Responses API Endpoint
+
+For the Responses API (`:responses`), use `previous_response_id` to link
+conversation turns server-side. Tool outputs are handled automatically:
+
+```elixir
+# First turn
+response1 = Aquila.ask(
+  "Calculate 2+2",
+  endpoint: :responses,
+  tools: [calculator_tool]
+)
+
+# Second turn - only need the new message and response_id
+response2 = Aquila.ask(
+  "Now multiply that by 3",
+  endpoint: :responses,
+  previous_response_id: response1.meta[:response_id],
+  tools: [calculator_tool]
+)
+```
+
+The Responses API automatically maintains the conversation state on the server,
+so you don't need to pass the full message history. Optionally use `store: true`
+to persist responses for later retrieval.
+
 ## Using LiteLLM for Other Providers
 
 If you need to reach non-OpenAI providers, deploy

@@ -105,12 +105,11 @@ defmodule Aquila.Gpt5RetryTest do
         assert String.contains?(response1.text, "17")
         assert_receive {:tool_called, "8+9"}, 5_000
 
-        # Second turn - continue conversation
-        messages = [
-          %{role: :user, content: "Calculate 8+9 using the calculator tool."},
-          %{role: :assistant, content: response1.text},
-          %{role: :user, content: "Now calculate 17*2 using the calculator."}
-        ]
+        # Second turn - continue conversation with full message history
+        # INCLUDING tool call and tool result messages from response1.meta.messages
+        messages =
+          response1.meta.messages ++
+            [%{role: :user, content: "Now calculate 17*2 using the calculator."}]
 
         response2 = Aquila.ask(messages, opts)
         assert String.contains?(response2.text, "34")

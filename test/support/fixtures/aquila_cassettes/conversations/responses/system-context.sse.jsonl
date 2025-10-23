@@ -1,6 +1,6 @@
-{"id":"resp_bGl0ZWxsbTpjdXN0b21fbGxtX3Byb3ZpZGVyOm9wZW5haTttb2RlbF9pZDo4ZjA1N2IyOTYzMGIzZDY1YzQyNmM3YWVmYjE4OTBkMzE5Y2U4OGE2NmFmMzY1NGUxNzc1NGIyN2I2Y2RjNmUxO3Jlc3BvbnNlX2lkOnJlc3BfMDlmZTkxNDM4ZmNhZTcwMjAwNjhmYTQzYTU1NTE4ODE5NWFlOTJjZDY1YTk3MDUzMjY=","request_id":1,"type":"response_ref"}
-{"payload":{"data":{"response":{"background":false,"created_at":1761231781,"id":"resp_bGl0ZWxsbTpjdXN0b21fbGxtX3Byb3ZpZGVyOm9wZW5haTttb2RlbF9pZDo4ZjA1N2IyOTYzMGIzZDY1YzQyNmM3YWVmYjE4OTBkMzE5Y2U4OGE2NmFmMzY1NGUxNzc1NGIyN2I2Y2RjNmUxO3Jlc3BvbnNlX2lkOnJlc3BfMDlmZTkxNDM4ZmNhZTcwMjAwNjhmYTQzYTU1NTE4ODE5NWFlOTJjZDY1YTk3MDUzMjY=","metadata":{},"model":"gpt-4o-mini-2024-07-18","object":"response","output":[],"parallel_tool_calls":true,"reasoning":{},"service_tier":"auto","status":"in_progress","store":true,"temperature":1.0,"text":{"format":{"type":"text"},"verbosity":"medium"},"tool_choice":"auto","tools":[],"top_logprobs":0,"top_p":1.0,"truncation":"disabled"},"sequence_number":1},"event":"in_progress","raw":{"response":{"background":false,"created_at":1761231781,"id":"resp_bGl0ZWxsbTpjdXN0b21fbGxtX3Byb3ZpZGVyOm9wZW5haTttb2RlbF9pZDo4ZjA1N2IyOTYzMGIzZDY1YzQyNmM3YWVmYjE4OTBkMzE5Y2U4OGE2NmFmMzY1NGUxNzc1NGIyN2I2Y2RjNmUxO3Jlc3BvbnNlX2lkOnJlc3BfMDlmZTkxNDM4ZmNhZTcwMjAwNjhmYTQzYTU1NTE4ODE5NWFlOTJjZDY1YTk3MDUzMjY=","metadata":{},"model":"gpt-4o-mini-2024-07-18","object":"response","output":[],"parallel_tool_calls":true,"reasoning":{},"service_tier":"auto","status":"in_progress","store":true,"temperature":1.0,"text":{"format":{"type":"text"},"verbosity":"medium"},"tool_choice":"auto","tools":[],"top_logprobs":0,"top_p":1.0,"truncation":"disabled"},"sequence_number":1,"type":"response.in_progress"},"source":"deep_research","type":"response.in_progress"},"request_id":1,"type":"event"}
-{"payload":{"data":{"item":{"content":[],"id":"msg_09fe91438fcae7020068fa43a600a48195a5cece90713f0271","role":"assistant","status":"in_progress","type":"message"},"output_index":0,"sequence_number":2},"event":"output_item_added","raw":{"item":{"content":[],"id":"msg_09fe91438fcae7020068fa43a600a48195a5cece90713f0271","role":"assistant","status":"in_progress","type":"message"},"output_index":0,"sequence_number":2,"type":"response.output_item.added"},"source":"deep_research","type":"response.output_item.added"},"request_id":1,"type":"event"}
+{"id":"resp_bGl0ZWxsbTpjdXN0b21fbGxtX3Byb3ZpZGVyOm9wZW5haTttb2RlbF9pZDo4ZjA1N2IyOTYzMGIzZDY1YzQyNmM3YWVmYjE4OTBkMzE5Y2U4OGE2NmFmMzY1NGUxNzc1NGIyN2I2Y2RjNmUxO3Jlc3BvbnNlX2lkOnJlc3BfMGE3ZGJmMzUxYTVkYjhmNzAwNjhmYTY0M2U3ZWRjODE5NGJiNzVkNDAzZmRhYTc0MzI=","request_id":1,"type":"response_ref"}
+{"payload":{"data":{"response":{"background":false,"created_at":1761240126,"id":"resp_bGl0ZWxsbTpjdXN0b21fbGxtX3Byb3ZpZGVyOm9wZW5haTttb2RlbF9pZDo4ZjA1N2IyOTYzMGIzZDY1YzQyNmM3YWVmYjE4OTBkMzE5Y2U4OGE2NmFmMzY1NGUxNzc1NGIyN2I2Y2RjNmUxO3Jlc3BvbnNlX2lkOnJlc3BfMGE3ZGJmMzUxYTVkYjhmNzAwNjhmYTY0M2U3ZWRjODE5NGJiNzVkNDAzZmRhYTc0MzI=","metadata":{},"model":"gpt-4o-mini-2024-07-18","object":"response","output":[],"parallel_tool_calls":true,"reasoning":{},"service_tier":"auto","status":"in_progress","store":true,"temperature":1.0,"text":{"format":{"type":"text"},"verbosity":"medium"},"tool_choice":"auto","tools":[],"top_logprobs":0,"top_p":1.0,"truncation":"disabled"},"sequence_number":1},"event":"in_progress","raw":{"response":{"background":false,"created_at":1761240126,"id":"resp_bGl0ZWxsbTpjdXN0b21fbGxtX3Byb3ZpZGVyOm9wZW5haTttb2RlbF9pZDo4ZjA1N2IyOTYzMGIzZDY1YzQyNmM3YWVmYjE4OTBkMzE5Y2U4OGE2NmFmMzY1NGUxNzc1NGIyN2I2Y2RjNmUxO3Jlc3BvbnNlX2lkOnJlc3BfMGE3ZGJmMzUxYTVkYjhmNzAwNjhmYTY0M2U3ZWRjODE5NGJiNzVkNDAzZmRhYTc0MzI=","metadata":{},"model":"gpt-4o-mini-2024-07-18","object":"response","output":[],"parallel_tool_calls":true,"reasoning":{},"service_tier":"auto","status":"in_progress","store":true,"temperature":1.0,"text":{"format":{"type":"text"},"verbosity":"medium"},"tool_choice":"auto","tools":[],"top_logprobs":0,"top_p":1.0,"truncation":"disabled"},"sequence_number":1,"type":"response.in_progress"},"source":"deep_research","type":"response.in_progress"},"request_id":1,"type":"event"}
+{"payload":{"data":{"item":{"content":[],"id":"msg_0a7dbf351a5db8f70068fa643f1e10819494ceeb5149096235","role":"assistant","status":"in_progress","type":"message"},"output_index":0,"sequence_number":2},"event":"output_item_added","raw":{"item":{"content":[],"id":"msg_0a7dbf351a5db8f70068fa643f1e10819494ceeb5149096235","role":"assistant","status":"in_progress","type":"message"},"output_index":0,"sequence_number":2,"type":"response.output_item.added"},"source":"deep_research","type":"response.output_item.added"},"request_id":1,"type":"event"}
 {"content":"Arr","request_id":1,"type":"delta"}
 {"content":"r","request_id":1,"type":"delta"}
 {"content":",","request_id":1,"type":"delta"}
@@ -8,75 +8,63 @@
 {"content":"y","request_id":1,"type":"delta"}
 {"content":"!","request_id":1,"type":"delta"}
 {"content":" The","request_id":1,"type":"delta"}
-{"content":" skies","request_id":1,"type":"delta"}
+{"content":" weather","request_id":1,"type":"delta"}
 {"content":" be","request_id":1,"type":"delta"}
-{"content":" cloudy","request_id":1,"type":"delta"}
-{"content":" or","request_id":1,"type":"delta"}
-{"content":" bright","request_id":1,"type":"delta"}
-{"content":",","request_id":1,"type":"delta"}
-{"content":" depend","request_id":1,"type":"delta"}
+{"content":" blow","request_id":1,"type":"delta"}
 {"content":"in","request_id":1,"type":"delta"}
 {"content":"'","request_id":1,"type":"delta"}
-{"content":" on","request_id":1,"type":"delta"}
-{"content":" where","request_id":1,"type":"delta"}
-{"content":" ye","request_id":1,"type":"delta"}
-{"content":" be","request_id":1,"type":"delta"}
-{"content":" sail","request_id":1,"type":"delta"}
-{"content":"in","request_id":1,"type":"delta"}
-{"content":"'.","request_id":1,"type":"delta"}
-{"content":" If","request_id":1,"type":"delta"}
-{"content":" ye","request_id":1,"type":"delta"}
-{"content":" be","request_id":1,"type":"delta"}
-{"content":" near","request_id":1,"type":"delta"}
-{"content":" the","request_id":1,"type":"delta"}
-{"content":" coast","request_id":1,"type":"delta"}
-{"content":",","request_id":1,"type":"delta"}
-{"content":" expect","request_id":1,"type":"delta"}
-{"content":" some","request_id":1,"type":"delta"}
-{"content":" salty","request_id":1,"type":"delta"}
+{"content":" fair","request_id":1,"type":"delta"}
+{"content":" an","request_id":1,"type":"delta"}
+{"content":"’","request_id":1,"type":"delta"}
 {"content":" bree","request_id":1,"type":"delta"}
-{"content":"zes","request_id":1,"type":"delta"}
-{"content":" and","request_id":1,"type":"delta"}
+{"content":"zy","request_id":1,"type":"delta"}
+{"content":",","request_id":1,"type":"delta"}
+{"content":" may","request_id":1,"type":"delta"}
+{"content":"haps","request_id":1,"type":"delta"}
+{"content":" with","request_id":1,"type":"delta"}
 {"content":" a","request_id":1,"type":"delta"}
 {"content":" chance","request_id":1,"type":"delta"}
 {"content":" of","request_id":1,"type":"delta"}
-{"content":" fair","request_id":1,"type":"delta"}
-{"content":" winds","request_id":1,"type":"delta"}
-{"content":".","request_id":1,"type":"delta"}
-{"content":" Best","request_id":1,"type":"delta"}
-{"content":" check","request_id":1,"type":"delta"}
-{"content":" yer","request_id":1,"type":"delta"}
-{"content":" charts","request_id":1,"type":"delta"}
-{"content":" and","request_id":1,"type":"delta"}
-{"content":" keep","request_id":1,"type":"delta"}
+{"content":" squ","request_id":1,"type":"delta"}
+{"content":"alls","request_id":1,"type":"delta"}
+{"content":"!","request_id":1,"type":"delta"}
+{"content":" Keep","request_id":1,"type":"delta"}
 {"content":" a","request_id":1,"type":"delta"}
 {"content":" weather","request_id":1,"type":"delta"}
 {"content":" eye","request_id":1,"type":"delta"}
-{"content":" out","request_id":1,"type":"delta"}
+{"content":" on","request_id":1,"type":"delta"}
+{"content":" the","request_id":1,"type":"delta"}
+{"content":" horizon","request_id":1,"type":"delta"}
 {"content":",","request_id":1,"type":"delta"}
 {"content":" lest","request_id":1,"type":"delta"}
 {"content":" ye","request_id":1,"type":"delta"}
-{"content":" be","request_id":1,"type":"delta"}
-{"content":" caught","request_id":1,"type":"delta"}
+{"content":" find","request_id":1,"type":"delta"}
+{"content":" y","request_id":1,"type":"delta"}
+{"content":"ers","request_id":1,"type":"delta"}
+{"content":"elf","request_id":1,"type":"delta"}
 {"content":" in","request_id":1,"type":"delta"}
-{"content":" a","request_id":1,"type":"delta"}
-{"content":" squ","request_id":1,"type":"delta"}
-{"content":"all","request_id":1,"type":"delta"}
-{"content":"!","request_id":1,"type":"delta"}
-{"content":" Avast","request_id":1,"type":"delta"}
+{"content":" D","request_id":1,"type":"delta"}
+{"content":"avy","request_id":1,"type":"delta"}
+{"content":" Jones","request_id":1,"type":"delta"}
+{"content":"'","request_id":1,"type":"delta"}
+{"content":" locker","request_id":1,"type":"delta"}
 {"content":"!","request_id":1,"type":"delta"}
 {"content":" What","request_id":1,"type":"delta"}
-{"content":" else","request_id":1,"type":"delta"}
-{"content":" do","request_id":1,"type":"delta"}
+{"content":" say","request_id":1,"type":"delta"}
 {"content":" ye","request_id":1,"type":"delta"}
-{"content":" seek","request_id":1,"type":"delta"}
-{"content":",","request_id":1,"type":"delta"}
-{"content":" ye","request_id":1,"type":"delta"}
-{"content":" land","request_id":1,"type":"delta"}
-{"content":"lub","request_id":1,"type":"delta"}
-{"content":"ber","request_id":1,"type":"delta"}
+{"content":" to","request_id":1,"type":"delta"}
+{"content":" sett","request_id":1,"type":"delta"}
+{"content":"in","request_id":1,"type":"delta"}
+{"content":"'","request_id":1,"type":"delta"}
+{"content":" sail","request_id":1,"type":"delta"}
 {"content":"?","request_id":1,"type":"delta"}
-{"payload":{"data":{"item":{"content":[{"annotations":[],"logprobs":[],"text":"Arrr, matey! The skies be cloudy or bright, dependin' on where ye be sailin'. If ye be near the coast, expect some salty breezes and a chance of fair winds. Best check yer charts and keep a weather eye out, lest ye be caught in a squall! Avast! What else do ye seek, ye landlubber?","type":"output_text"}],"id":"msg_09fe91438fcae7020068fa43a600a48195a5cece90713f0271","role":"assistant","status":"completed","type":"message"},"output_index":0,"sequence_number":81},"event":"output_item_done","raw":{"item":{"content":[{"annotations":[],"logprobs":[],"text":"Arrr, matey! The skies be cloudy or bright, dependin' on where ye be sailin'. If ye be near the coast, expect some salty breezes and a chance of fair winds. Best check yer charts and keep a weather eye out, lest ye be caught in a squall! Avast! What else do ye seek, ye landlubber?","type":"output_text"}],"id":"msg_09fe91438fcae7020068fa43a600a48195a5cece90713f0271","role":"assistant","status":"completed","type":"message"},"output_index":0,"sequence_number":81,"type":"response.output_item.done"},"source":"deep_research","type":"response.output_item.done"},"request_id":1,"type":"event"}
-{"content":"Arrr, matey! The skies be cloudy or bright, dependin' on where ye be sailin'. If ye be near the coast, expect some salty breezes and a chance of fair winds. Best check yer charts and keep a weather eye out, lest ye be caught in a squall! Avast! What else do ye seek, ye landlubber?","request_id":1,"type":"delta"}
-{"meta":{"_fallback_text":"Arrr, matey! The skies be cloudy or bright, dependin' on where ye be sailin'. If ye be near the coast, expect some salty breezes and a chance of fair winds. Best check yer charts and keep a weather eye out, lest ye be caught in a squall! Avast! What else do ye seek, ye landlubber?","id":"resp_bGl0ZWxsbTpjdXN0b21fbGxtX3Byb3ZpZGVyOm9wZW5haTttb2RlbF9pZDo4ZjA1N2IyOTYzMGIzZDY1YzQyNmM3YWVmYjE4OTBkMzE5Y2U4OGE2NmFmMzY1NGUxNzc1NGIyN2I2Y2RjNmUxO3Jlc3BvbnNlX2lkOnJlc3BfMDlmZTkxNDM4ZmNhZTcwMjAwNjhmYTQzYTU1NTE4ODE5NWFlOTJjZDY1YTk3MDUzMjY=","metadata":{},"status":"completed","usage":{"input_tokens":28,"input_tokens_details":{"cached_tokens":0},"output_tokens":76,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":104}},"request_id":1,"status":"completed","type":"done"}
+{"content":" ☠","request_id":1,"type":"delta"}
+{"content":"️","request_id":1,"type":"delta"}
+{"content":"🏴","request_id":1,"type":"delta"}
+{"content":"‍","request_id":1,"type":"delta"}
+{"content":"☠","request_id":1,"type":"delta"}
+{"content":"️","request_id":1,"type":"delta"}
+{"payload":{"data":{"item":{"content":[{"annotations":[],"logprobs":[],"text":"Arrr, matey! The weather be blowin' fair an’ breezy, mayhaps with a chance of squalls! Keep a weather eye on the horizon, lest ye find yerself in Davy Jones' locker! What say ye to settin' sail? ☠️🏴‍☠️","type":"output_text"}],"id":"msg_0a7dbf351a5db8f70068fa643f1e10819494ceeb5149096235","role":"assistant","status":"completed","type":"message"},"output_index":0,"sequence_number":69},"event":"output_item_done","raw":{"item":{"content":[{"annotations":[],"logprobs":[],"text":"Arrr, matey! The weather be blowin' fair an’ breezy, mayhaps with a chance of squalls! Keep a weather eye on the horizon, lest ye find yerself in Davy Jones' locker! What say ye to settin' sail? ☠️🏴‍☠️","type":"output_text"}],"id":"msg_0a7dbf351a5db8f70068fa643f1e10819494ceeb5149096235","role":"assistant","status":"completed","type":"message"},"output_index":0,"sequence_number":69,"type":"response.output_item.done"},"source":"deep_research","type":"response.output_item.done"},"request_id":1,"type":"event"}
+{"content":"Arrr, matey! The weather be blowin' fair an’ breezy, mayhaps with a chance of squalls! Keep a weather eye on the horizon, lest ye find yerself in Davy Jones' locker! What say ye to settin' sail? ☠️🏴‍☠️","request_id":1,"type":"delta"}
+{"meta":{"_fallback_text":"Arrr, matey! The weather be blowin' fair an’ breezy, mayhaps with a chance of squalls! Keep a weather eye on the horizon, lest ye find yerself in Davy Jones' locker! What say ye to settin' sail? ☠️🏴‍☠️","id":"resp_bGl0ZWxsbTpjdXN0b21fbGxtX3Byb3ZpZGVyOm9wZW5haTttb2RlbF9pZDo4ZjA1N2IyOTYzMGIzZDY1YzQyNmM3YWVmYjE4OTBkMzE5Y2U4OGE2NmFmMzY1NGUxNzc1NGIyN2I2Y2RjNmUxO3Jlc3BvbnNlX2lkOnJlc3BfMGE3ZGJmMzUxYTVkYjhmNzAwNjhmYTY0M2U3ZWRjODE5NGJiNzVkNDAzZmRhYTc0MzI=","metadata":{},"status":"completed","usage":{"input_tokens":28,"input_tokens_details":{"cached_tokens":0},"output_tokens":67,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":95}},"request_id":1,"status":"completed","type":"done"}
 {"meta":null,"request_id":1,"status":"completed","type":"done"}

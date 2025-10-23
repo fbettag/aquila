@@ -410,7 +410,7 @@ defmodule Aquila.Engine do
     # Detect infinite tool call loops before executing
     case detect_tool_loop(state, ready) do
       {:loop_detected, call_signature} ->
-        raise RuntimeError, "Tool call loop detected: #{inspect(call_signature)}"
+        handle_tool_loop_detected(state, ready, pending, call_signature)
 
       :no_loop ->
         # No loop detected, proceed normally
@@ -999,6 +999,8 @@ defmodule Aquila.Engine do
       |> Map.put(:endpoint, state.endpoint)
       |> Map.put(:status, state.status)
       |> maybe_put_usage(state.usage)
+      |> Map.put(:messages, Message.to_list(state.messages))
+      |> maybe_put(:response_id, state.response_id)
 
     {fallback_text, meta} = Map.pop(meta, :_fallback_text)
 
@@ -1339,6 +1341,126 @@ defmodule Aquila.Engine do
       true ->
         %{}
     end
+  end
+
+  defp handle_tool_loop_detected(%State{} = state, ready_calls, pending_calls, call_signature) do
+    {tool_name, tool_args} = call_signature
+
+    Logger.warning(
+      "Tool call loop detected; returning error payload instead of executing tool",
+      tool: tool_name,
+      args: tool_args
+    )
+
+    {payloads, {messages, tool_context, tool_outputs, call_history}} =
+      Enum.map_reduce(
+        ready_calls,
+        {state.messages, state.tool_context, [], state.tool_call_history},
+        fn call, {msgs, ctx, outputs, history} ->
+          msgs_with_call = maybe_append_assistant_tool_call(state, msgs, call)
+          args = extract_tool_call_args(call)
+
+          Sink.notify(
+            state.sink,
+            {:event, %{type: :tool_call_start, name: call.name, args: args, id: call.id}},
+            state.ref
+          )
+
+          output_text = loop_error_output(call, args)
+          normalized_output = normalize_tool_output(output_text)
+
+          Sink.notify(
+            state.sink,
+            {:event,
+             %{
+               type: :tool_call_result,
+               name: call.name,
+               args: args,
+               output: normalized_output,
+               id: call.id,
+               status: :error,
+               reason: :loop_detected
+             }},
+            state.ref
+          )
+
+          new_messages =
+            case state.endpoint do
+              :chat ->
+                msgs_with_call ++
+                  [
+                    tool_output_message_for_state(
+                      state,
+                      call.name,
+                      call.call_id || call.id,
+                      normalized_output
+                    )
+                  ]
+
+              _ ->
+                msgs
+            end
+
+          payload = %{
+            id: call.id,
+            call_id: call.call_id || call.id,
+            name: call.name,
+            output: normalized_output
+          }
+
+          output_info = %{
+            call_id: call.id,
+            name: call.name,
+            args: args,
+            output: normalized_output
+          }
+
+          call_signature = {call.name, args}
+
+          {payload, {new_messages, ctx, [output_info | outputs], [call_signature | history]}}
+        end
+      )
+
+    payloads = Enum.reverse(payloads)
+    tool_outputs = Enum.reverse(tool_outputs)
+
+    updated_state =
+      case state.endpoint do
+        :responses -> %{state | tool_payloads: payloads}
+        :chat -> %{state | messages: messages}
+      end
+
+    %{
+      updated_state
+      | pending_calls: pending_calls,
+        status: :in_progress,
+        final_meta: append_tool_meta(state.final_meta, ready_calls),
+        tool_context: tool_context,
+        last_tool_outputs: tool_outputs,
+        tool_call_history: call_history
+    }
+  end
+
+  defp loop_error_output(call, args) do
+    rendered_args = render_loop_args(args)
+
+    [
+      "Tool loop detected for ",
+      call.name,
+      ". This call was blocked because the same arguments were invoked repeatedly. ",
+      "Update the prompt or adjust the tool to return new information before calling it again.",
+      "\nArguments: ",
+      rendered_args
+    ]
+    |> IO.iodata_to_binary()
+  end
+
+  defp render_loop_args(args) when is_map(args) do
+    inspect(args, limit: 10, printable_limit: 200)
+  end
+
+  defp render_loop_args(args) do
+    inspect(args, limit: 10, printable_limit: 200)
   end
 
   # Detects if we're in a tool call loop (same tool being called repeatedly with same args).

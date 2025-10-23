@@ -162,6 +162,58 @@ defmodule Aquila.Message do
     end
   end
 
+  @doc """
+  Converts a list of messages to serializable map format.
+
+  This is useful for maintaining conversation history across multiple turns,
+  especially when tools are involved. The returned list can be passed to
+  subsequent `Aquila.ask/2` calls.
+
+  ## Examples
+
+      iex> messages = [
+      ...>   Message.new(:user, "Hello"),
+      ...>   Message.new(:assistant, "Hi there!")
+      ...> ]
+      iex> Message.to_list(messages)
+      [
+        %{role: :user, content: "Hello"},
+        %{role: :assistant, content: "Hi there!"}
+      ]
+  """
+  @spec to_list([t()]) :: [map()]
+  def to_list(messages) when is_list(messages) do
+    Enum.map(messages, &to_map/1)
+  end
+
+  @doc false
+  @spec to_map(t()) :: map()
+  def to_map(%__MODULE__{} = message) do
+    base = %{
+      role: message.role,
+      content: normalize_content_for_serialization(message.content)
+    }
+
+    base
+    |> maybe_put_field(:name, message.name)
+    |> maybe_put_field(:tool_call_id, message.tool_call_id)
+    |> maybe_put_field(:tool_calls, message.tool_calls)
+  end
+
+  defp normalize_content_for_serialization(content) when is_binary(content), do: content
+  defp normalize_content_for_serialization(content) when is_list(content), do: content
+  defp normalize_content_for_serialization(content) when is_map(content), do: content
+
+  defp normalize_content_for_serialization(content) do
+    # For iodata that's not a simple binary/list/map, convert to binary
+    IO.iodata_to_binary(content)
+  rescue
+    _ -> inspect(content)
+  end
+
+  defp maybe_put_field(map, _key, nil), do: map
+  defp maybe_put_field(map, key, value), do: Map.put(map, key, value)
+
   defp string_role("system"), do: :system
   defp string_role("user"), do: :user
   defp string_role("assistant"), do: :assistant

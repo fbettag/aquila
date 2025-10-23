@@ -1,27 +1,16 @@
-{"args_fragment":"","call_id":"call_8hq95d8h5m3PFNpBrf2YZ8ZV","id":"call_8hq95d8h5m3PFNpBrf2YZ8ZV","name":"calculator","request_id":1,"type":"tool_call"}
-{"args_fragment":"{\"","call_id":"call_8hq95d8h5m3PFNpBrf2YZ8ZV","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"expression","call_id":"call_8hq95d8h5m3PFNpBrf2YZ8ZV","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"\":\"","call_id":"call_8hq95d8h5m3PFNpBrf2YZ8ZV","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"10","call_id":"call_8hq95d8h5m3PFNpBrf2YZ8ZV","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"-","call_id":"call_8hq95d8h5m3PFNpBrf2YZ8ZV","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"3","call_id":"call_8hq95d8h5m3PFNpBrf2YZ8ZV","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"\"}","call_id":"call_8hq95d8h5m3PFNpBrf2YZ8ZV","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args":{"expression":"10-3"},"call_id":"call_8hq95d8h5m3PFNpBrf2YZ8ZV","id":"call_8hq95d8h5m3PFNpBrf2YZ8ZV","name":"calculator","request_id":1,"type":"tool_call_end"}
-{"meta":{"id":"chatcmpl-CTr8dpl1C1ZarBan7ONaK94IoHf9B","model":"gpt-5-mini","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
+{"args_fragment":"","call_id":"call_95vQEvsJf7EFB7gUhUvfap47","id":"call_95vQEvsJf7EFB7gUhUvfap47","name":"calculator","request_id":1,"type":"tool_call"}
+{"args_fragment":"{\"","call_id":"call_95vQEvsJf7EFB7gUhUvfap47","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"expression","call_id":"call_95vQEvsJf7EFB7gUhUvfap47","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"\":\"","call_id":"call_95vQEvsJf7EFB7gUhUvfap47","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"10","call_id":"call_95vQEvsJf7EFB7gUhUvfap47","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"-","call_id":"call_95vQEvsJf7EFB7gUhUvfap47","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"3","call_id":"call_95vQEvsJf7EFB7gUhUvfap47","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"\"}","call_id":"call_95vQEvsJf7EFB7gUhUvfap47","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args":{"expression":"10-3"},"call_id":"call_95vQEvsJf7EFB7gUhUvfap47","id":"call_95vQEvsJf7EFB7gUhUvfap47","name":"calculator","request_id":1,"type":"tool_call_end"}
+{"meta":{"id":"chatcmpl-CTtHXWFXDzxxBQTfZZ7WV0uiN2M1t","model":"gpt-5-mini","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
 {"request_id":1,"type":"usage","usage":{"completion_tokens":25,"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":0,"rejected_prediction_tokens":0},"prompt_tokens":158,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"total_tokens":183}}
 {"meta":null,"request_id":1,"status":"completed","type":"done"}
-{"content":"The","request_id":2,"type":"delta"}
-{"content":" result","request_id":2,"type":"delta"}
-{"content":" of","request_id":2,"type":"delta"}
-{"content":" ","request_id":2,"type":"delta"}
-{"content":"10","request_id":2,"type":"delta"}
-{"content":" -","request_id":2,"type":"delta"}
-{"content":" ","request_id":2,"type":"delta"}
-{"content":"3","request_id":2,"type":"delta"}
-{"content":" is","request_id":2,"type":"delta"}
-{"content":" ","request_id":2,"type":"delta"}
 {"content":"7","request_id":2,"type":"delta"}
-{"content":".","request_id":2,"type":"delta"}
-{"meta":{"id":"chatcmpl-CTr8edc4ZSPys5wxpxhgJXr96Ms3h","model":"gpt-5-mini"},"request_id":2,"status":"completed","type":"done"}
-{"request_id":2,"type":"usage","usage":{"completion_tokens":15,"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":0,"rejected_prediction_tokens":0},"prompt_tokens":192,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"total_tokens":207}}
+{"meta":{"id":"chatcmpl-CTtHZI86mtxdFd5rzabWncMZfqdcs","model":"gpt-5-mini"},"request_id":2,"status":"completed","type":"done"}
+{"request_id":2,"type":"usage","usage":{"completion_tokens":4,"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":0,"rejected_prediction_tokens":0},"prompt_tokens":192,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"total_tokens":196}}
 {"meta":null,"request_id":2,"status":"completed","type":"done"}

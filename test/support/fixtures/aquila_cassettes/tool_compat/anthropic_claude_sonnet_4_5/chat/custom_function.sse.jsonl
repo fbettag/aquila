@@ -1,20 +1,18 @@
 {"content":"","request_id":1,"type":"delta"}
-{"args_fragment":"","call_id":"toolu_01CoBtj4YfoLymKw3JjkBmeV","id":"toolu_01CoBtj4YfoLymKw3JjkBmeV","name":"calculator","request_id":1,"type":"tool_call"}
+{"args_fragment":"","call_id":"toolu_01RqnHdAT1MRB3RHV6u7xNyW","id":"toolu_01RqnHdAT1MRB3RHV6u7xNyW","name":"calculator","request_id":1,"type":"tool_call"}
 {"content":"","request_id":1,"type":"delta"}
-{"args_fragment":"","call_id":"toolu_01CoBtj4YfoLymKw3JjkBmeV","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"","call_id":"toolu_01RqnHdAT1MRB3RHV6u7xNyW","id":null,"name":null,"request_id":1,"type":"tool_call"}
 {"content":"","request_id":1,"type":"delta"}
-{"args_fragment":"{\"expre","call_id":"toolu_01CoBtj4YfoLymKw3JjkBmeV","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"{\"expre","call_id":"toolu_01RqnHdAT1MRB3RHV6u7xNyW","id":null,"name":null,"request_id":1,"type":"tool_call"}
 {"content":"","request_id":1,"type":"delta"}
-{"args_fragment":"ss","call_id":"toolu_01CoBtj4YfoLymKw3JjkBmeV","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"ssion\": \"2","call_id":"toolu_01RqnHdAT1MRB3RHV6u7xNyW","id":null,"name":null,"request_id":1,"type":"tool_call"}
 {"content":"","request_id":1,"type":"delta"}
-{"args_fragment":"ion\": ","call_id":"toolu_01CoBtj4YfoLymKw3JjkBmeV","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"content":"","request_id":1,"type":"delta"}
-{"args_fragment":"\"2+2\"}","call_id":"toolu_01CoBtj4YfoLymKw3JjkBmeV","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args":{"expression":"2+2"},"call_id":"toolu_01CoBtj4YfoLymKw3JjkBmeV","id":"toolu_01CoBtj4YfoLymKw3JjkBmeV","name":"calculator","request_id":1,"type":"tool_call_end"}
-{"meta":{"id":"chatcmpl-a236820c-e5ab-47c7-a324-4a05c27a15dd","model":"claude-sonnet-4-5","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
+{"args_fragment":"+2\"}","call_id":"toolu_01RqnHdAT1MRB3RHV6u7xNyW","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args":{"expression":"2+2"},"call_id":"toolu_01RqnHdAT1MRB3RHV6u7xNyW","id":"toolu_01RqnHdAT1MRB3RHV6u7xNyW","name":"calculator","request_id":1,"type":"tool_call_end"}
+{"meta":{"id":"chatcmpl-f4b34420-6208-4867-8499-bec61c9b5df6","model":"claude-sonnet-4-5","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
 {"meta":null,"request_id":1,"status":"completed","type":"done"}
-{"content":"The","request_id":2,"type":"delta"}
-{"content":" result of 2+2 is **","request_id":2,"type":"delta"}
+{"content":"The result","request_id":2,"type":"delta"}
+{"content":" of 2+2 is **","request_id":2,"type":"delta"}
 {"content":"4**.","request_id":2,"type":"delta"}
-{"meta":{"id":"chatcmpl-4b36395e-3ec5-47da-a4cd-5fb9d2db325f","model":"claude-sonnet-4-5"},"request_id":2,"status":"completed","type":"done"}
+{"meta":{"id":"chatcmpl-e76b146f-9e15-4e9e-bced-41e83f5fb340","model":"claude-sonnet-4-5"},"request_id":2,"status":"completed","type":"done"}
 {"meta":null,"request_id":2,"status":"completed","type":"done"}
