@@ -1,13 +1,18 @@
-{"args_fragment":"{\"expression\":\"2+2\"}","call_id":"call_32192321","id":"call_32192321","name":"calculator","request_id":1,"type":"tool_call"}
-{"args":{"expression":"2+2"},"call_id":"call_32192321","id":"call_32192321","name":"calculator","request_id":1,"type":"tool_call_end"}
-{"meta":{"id":"73c41e01-ec68-b2ec-78f6-d9e8b309e339_us-east-1","model":"grok-4-fast-non-reasoning","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
+{"args_fragment":"{\"expression\":\"2+2\"}","call_id":"call_16663397","id":"call_16663397","name":"calculator","request_id":1,"type":"tool_call"}
+{"args":{"expression":"2+2"},"call_id":"call_16663397","id":"call_16663397","name":"calculator","request_id":1,"type":"tool_call_end"}
+{"meta":{"id":"d5b90ced-4d53-85f3-32b9-c2151d9b2314_us-east-1","model":"grok-4-fast-non-reasoning","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
 {"meta":null,"request_id":1,"status":"completed","type":"done"}
+{"content":"The","request_id":2,"type":"delta"}
+{"content":" result","request_id":2,"type":"delta"}
+{"content":" of","request_id":2,"type":"delta"}
+{"content":" ","request_id":2,"type":"delta"}
 {"content":"2","request_id":2,"type":"delta"}
 {"content":" +","request_id":2,"type":"delta"}
 {"content":" ","request_id":2,"type":"delta"}
 {"content":"2","request_id":2,"type":"delta"}
-{"content":" =","request_id":2,"type":"delta"}
+{"content":" is","request_id":2,"type":"delta"}
 {"content":" ","request_id":2,"type":"delta"}
 {"content":"4","request_id":2,"type":"delta"}
-{"meta":{"id":"9297cbef-f7d3-c37f-3377-36125453e54b_us-east-1","model":"grok-4-fast-non-reasoning"},"request_id":2,"status":"completed","type":"done"}
+{"content":".","request_id":2,"type":"delta"}
+{"meta":{"id":"e74aa349-fa51-917e-e722-dd511e62d64c_us-east-1","model":"grok-4-fast-non-reasoning"},"request_id":2,"status":"completed","type":"done"}
 {"meta":null,"request_id":2,"status":"completed","type":"done"}

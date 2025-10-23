@@ -16,3 +16,10 @@ config :aquila, :openai,
 
 # Print only warnings and errors during test
 config :logger, level: :error
+
+# Suppress SASL reports (Task crashes, supervisor errors) during tests
+config :logger, :console,
+  format: "$time $metadata[$level] $message\n",
+  metadata: [:request_id],
+  handle_otp_reports: false,
+  handle_sasl_reports: false

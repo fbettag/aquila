@@ -11,7 +11,7 @@
 {"args_fragment":"\"\n","call_id":"calculator:0","id":null,"name":null,"request_id":1,"type":"tool_call"}
 {"args_fragment":"}","call_id":"calculator:0","id":null,"name":null,"request_id":1,"type":"tool_call"}
 {"args":{"expression":"2+2"},"call_id":"calculator:0","id":"calculator:0","name":"calculator","request_id":1,"type":"tool_call_end"}
-{"meta":{"id":"chatcmpl-68fa0b8fc516bdd6e4813e51","model":"kimi-latest","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
+{"meta":{"id":"chatcmpl-68fa42150f4343192b941b0c","model":"kimi-latest","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
 {"meta":null,"request_id":1,"status":"completed","type":"done"}
 {"content":"The","request_id":2,"type":"delta"}
 {"content":" result","request_id":2,"type":"delta"}
@@ -24,5 +24,5 @@
 {"content":" ","request_id":2,"type":"delta"}
 {"content":"4","request_id":2,"type":"delta"}
 {"content":".","request_id":2,"type":"delta"}
-{"meta":{"id":"chatcmpl-68fa0b912f7ffc51846e6281","model":"kimi-latest"},"request_id":2,"status":"completed","type":"done"}
+{"meta":{"id":"chatcmpl-68fa4217f96522fad3c9eb4f","model":"kimi-latest"},"request_id":2,"status":"completed","type":"done"}
 {"meta":null,"request_id":2,"status":"completed","type":"done"}

@@ -2,6 +2,8 @@ defmodule Aquila.ToolCompatibilityTest do
   use ExUnit.Case, async: true
   use Aquila.Cassette
 
+  import Aquila.TestTools
+
   alias Aquila.Tool
 
   @moduledoc """
@@ -61,40 +63,6 @@ defmodule Aquila.ToolCompatibilityTest do
   @retry_direct_models [
     "gpt-5"
   ]
-
-  # Helper to create custom function tool that calculates
-  defp calculator_tool(test_pid) do
-    Tool.new(
-      "calculator",
-      [
-        description:
-          "Performs basic arithmetic calculations. Use this to calculate math expressions.",
-        parameters: %{
-          type: :object,
-          properties: %{
-            expression: %{
-              type: :string,
-              required: true,
-              description: "Math expression to evaluate (e.g., '2+2', '10*5')"
-            }
-          }
-        }
-      ],
-      fn args ->
-        # Notify test that tool was called
-        expression = Map.get(args, "expression", "2+2")
-        send(test_pid, {:tool_called, expression})
-
-        # Return the correct calculation to avoid smart models retrying
-        try do
-          {result, _} = Code.eval_string(expression)
-          "The result is #{result}"
-        rescue
-          _ -> "The result is 4"
-        end
-      end
-    )
-  end
 
   defp sanitize_model(model) do
     model

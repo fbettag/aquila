@@ -12,24 +12,27 @@
 {"content":" for","request_id":1,"type":"delta"}
 {"content":" you","request_id":1,"type":"delta"}
 {"content":".","request_id":1,"type":"delta"}
-{"args_fragment":"","call_id":"call_00_RRifuSw62tpM0gZFWfcx4ETs","id":"call_00_RRifuSw62tpM0gZFWfcx4ETs","name":"calculator","request_id":1,"type":"tool_call"}
-{"args_fragment":"{\"","call_id":"call_00_RRifuSw62tpM0gZFWfcx4ETs","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"expression","call_id":"call_00_RRifuSw62tpM0gZFWfcx4ETs","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"\":","call_id":"call_00_RRifuSw62tpM0gZFWfcx4ETs","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":" \"","call_id":"call_00_RRifuSw62tpM0gZFWfcx4ETs","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"2","call_id":"call_00_RRifuSw62tpM0gZFWfcx4ETs","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"+","call_id":"call_00_RRifuSw62tpM0gZFWfcx4ETs","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"2","call_id":"call_00_RRifuSw62tpM0gZFWfcx4ETs","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"\"}","call_id":"call_00_RRifuSw62tpM0gZFWfcx4ETs","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args":{"expression":"2+2"},"call_id":"call_00_RRifuSw62tpM0gZFWfcx4ETs","id":"call_00_RRifuSw62tpM0gZFWfcx4ETs","name":"calculator","request_id":1,"type":"tool_call_end"}
-{"meta":{"id":"317e6cbe-a970-4cd1-9578-ccfea9053e7d","model":"deepseek-chat","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
+{"args_fragment":"","call_id":"call_00_BXxtsvg2gTIATboPBROdzN4x","id":"call_00_BXxtsvg2gTIATboPBROdzN4x","name":"calculator","request_id":1,"type":"tool_call"}
+{"args_fragment":"{\"","call_id":"call_00_BXxtsvg2gTIATboPBROdzN4x","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"expression","call_id":"call_00_BXxtsvg2gTIATboPBROdzN4x","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"\":","call_id":"call_00_BXxtsvg2gTIATboPBROdzN4x","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":" \"","call_id":"call_00_BXxtsvg2gTIATboPBROdzN4x","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"2","call_id":"call_00_BXxtsvg2gTIATboPBROdzN4x","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"+","call_id":"call_00_BXxtsvg2gTIATboPBROdzN4x","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"2","call_id":"call_00_BXxtsvg2gTIATboPBROdzN4x","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"\"}","call_id":"call_00_BXxtsvg2gTIATboPBROdzN4x","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args":{"expression":"2+2"},"call_id":"call_00_BXxtsvg2gTIATboPBROdzN4x","id":"call_00_BXxtsvg2gTIATboPBROdzN4x","name":"calculator","request_id":1,"type":"tool_call_end"}
+{"meta":{"id":"fd1a5e25-2b5f-4c48-898b-1293f34ffd52","model":"deepseek-chat","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
 {"meta":null,"request_id":1,"status":"completed","type":"done"}
-{"content":"2","request_id":2,"type":"delta"}
-{"content":" +","request_id":2,"type":"delta"}
+{"content":"The","request_id":2,"type":"delta"}
+{"content":" calculation","request_id":2,"type":"delta"}
 {"content":" ","request_id":2,"type":"delta"}
 {"content":"2","request_id":2,"type":"delta"}
-{"content":" =","request_id":2,"type":"delta"}
+{"content":"+","request_id":2,"type":"delta"}
+{"content":"2","request_id":2,"type":"delta"}
+{"content":" equals","request_id":2,"type":"delta"}
 {"content":" ","request_id":2,"type":"delta"}
 {"content":"4","request_id":2,"type":"delta"}
-{"meta":{"id":"ae9adcf9-417f-4fe4-a718-00094d8207b3","model":"deepseek-chat"},"request_id":2,"status":"completed","type":"done"}
+{"content":".","request_id":2,"type":"delta"}
+{"meta":{"id":"c2908a46-7587-4a77-ae25-e3b42c405c48","model":"deepseek-chat"},"request_id":2,"status":"completed","type":"done"}
 {"meta":null,"request_id":2,"status":"completed","type":"done"}

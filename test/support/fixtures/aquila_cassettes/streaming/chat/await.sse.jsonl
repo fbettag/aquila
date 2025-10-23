@@ -1,6 +1,6 @@
 {"content":"Test","request_id":1,"type":"delta"}
 {"content":" complete","request_id":1,"type":"delta"}
 {"content":".","request_id":1,"type":"delta"}
-{"meta":{"id":"chatcmpl-CTnTGeb4P5WNkiD81ErdnO048w0Hh","model":"gpt-4o-mini"},"request_id":1,"status":"completed","type":"done"}
+{"meta":{"id":"chatcmpl-CTr9VD9fvOSSJa1oUVMJ6k5pp6wet","model":"gpt-4o-mini"},"request_id":1,"status":"completed","type":"done"}
 {"request_id":1,"type":"usage","usage":{"completion_tokens":3,"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":0,"rejected_prediction_tokens":0},"prompt_tokens":12,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"total_tokens":15}}
 {"meta":null,"request_id":1,"status":"completed","type":"done"}
