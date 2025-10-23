@@ -11,12 +11,19 @@ defmodule Aquila.Engine do
   """
 
   alias Aquila.Endpoint
+  alias Aquila.Engine.Chat
+  alias Aquila.Engine.Responses
+  alias Aquila.Engine.Shared
   alias Aquila.Message
   alias Aquila.Response
   alias Aquila.Sink
   alias Aquila.Tool
 
   require Logger
+
+  # Get the endpoint-specific implementation module
+  defp get_endpoint_impl(%{endpoint: :chat}), do: Chat
+  defp get_endpoint_impl(%{endpoint: :responses}), do: Responses
 
   defmodule State do
     @moduledoc false
@@ -324,7 +331,7 @@ defmodule Aquila.Engine do
   end
 
   defp handle_event(%State{} = state, %{type: :tool_call, id: id} = event) when not is_nil(id) do
-    pending = track_tool_call(state.pending_calls, event)
+    pending = Shared.track_tool_call(state.pending_calls, event)
     %{state | pending_calls: pending, raw_events: [event | state.raw_events]}
   end
 
@@ -334,7 +341,7 @@ defmodule Aquila.Engine do
   end
 
   defp handle_event(%State{} = state, %{type: :tool_call_end} = event) do
-    pending = finalize_tool_call(state.pending_calls, event)
+    pending = Shared.finalize_tool_call(state.pending_calls, event)
     %{state | pending_calls: pending, raw_events: [event | state.raw_events]}
   end
 
@@ -345,7 +352,7 @@ defmodule Aquila.Engine do
     # When finish_reason indicates tool calls, ensure all collecting calls are finalized
     state =
       if status == :requires_action do
-        %{state | pending_calls: finalize_all_collecting_calls(state.pending_calls)}
+        %{state | pending_calls: Shared.finalize_all_collecting_calls(state.pending_calls)}
       else
         state
       end
@@ -414,14 +421,21 @@ defmodule Aquila.Engine do
 
       :no_loop ->
         # No loop detected, proceed normally
+        endpoint_impl = get_endpoint_impl(state)
+
         {payloads, {messages, tool_context, tool_outputs, call_history}} =
           Enum.map_reduce(
             ready,
             {state.messages, state.tool_context, [], state.tool_call_history},
             fn call, {msgs, ctx, outputs, history} ->
               state_for_call = %{state | tool_context: ctx}
-              msgs_with_call = maybe_append_assistant_tool_call(state_for_call, msgs, call)
-              {payload, new_msgs, new_ctx} = invoke_tool(state_for_call, call, msgs_with_call)
+
+              msgs_with_call =
+                endpoint_impl.maybe_append_assistant_tool_call(state_for_call, msgs, call)
+
+              {payload, new_msgs, new_ctx} =
+                Shared.invoke_tool(state_for_call, call, msgs_with_call, endpoint_impl)
+
               # Store tool output info for potential retry (include args for role switching)
               output_info = %{
                 call_id: call.id,
@@ -439,447 +453,38 @@ defmodule Aquila.Engine do
         payloads = Enum.reverse(payloads)
         tool_outputs = Enum.reverse(tool_outputs)
 
+        # Use endpoint-specific handler for tool outputs
         updated_state =
-          case state.endpoint do
-            # For Responses API, only update tool_payloads, NOT messages
-            # Messages are only updated for Chat API where function messages are needed
-            :responses -> %{state | tool_payloads: payloads}
-            :chat -> %{state | messages: messages}
-          end
+          endpoint_impl.handle_tool_outputs(
+            state,
+            payloads,
+            messages,
+            tool_context,
+            tool_outputs,
+            call_history
+          )
 
         %{
           updated_state
           | pending_calls: pending,
             status: :in_progress,
-            final_meta: append_tool_meta(state.final_meta, ready),
-            tool_context: tool_context,
-            last_tool_outputs: tool_outputs,
-            tool_call_history: call_history
+            final_meta: Shared.append_tool_meta(state.final_meta, ready)
         }
-    end
-  end
-
-  defp invoke_tool(state, call, messages) do
-    tool = Map.get(state.tool_map, call.name)
-
-    unless tool do
-      raise ArgumentError, "no tool registered for #{call.name}"
-    end
-
-    args = call.args || parse_args(call.args_fragment)
-
-    # Emit tool call event before execution
-    Sink.notify(
-      state.sink,
-      {:event, %{type: :tool_call_start, name: call.name, args: args, id: call.id}},
-      state.ref
-    )
-
-    start = System.monotonic_time()
-
-    {status, value, context_patch} =
-      try do
-        invoke_tool_function(tool.function, args, state.tool_context)
-      rescue
-        exception ->
-          Logger.warning("Tool #{call.name} raised", exception: Exception.message(exception))
-          Sink.notify(state.sink, {:error, %{tool: call.name, error: exception}}, state.ref)
-          reraise(exception, __STACKTRACE__)
-      end
-
-    if status == :error do
-      Logger.warning("Tool returned error", tool: call.name, reason: value)
-    end
-
-    duration = System.monotonic_time() - start
-
-    :telemetry.execute([:aquila, :tool, :invoke], %{duration: duration}, %{
-      name: call.name,
-      model: state.model
-    })
-
-    output = normalize_tool_output(value)
-    new_context = merge_tool_context(state.tool_context, context_patch)
-
-    payload = %{id: call.id, call_id: call.call_id || call.id, name: call.name, output: output}
-
-    # Emit tool call completion event with result
-    event_payload =
-      %{type: :tool_call_result, name: call.name, args: args, output: output, id: call.id}
-      |> Map.put(:status, status)
-      |> maybe_put(:context, new_context)
-      |> maybe_put(:context_patch, empty_map_to_nil(context_patch))
-
-    Sink.notify(
-      state.sink,
-      {:event, event_payload},
-      state.ref
-    )
-
-    new_messages =
-      case state.endpoint do
-        :chat -> messages ++ [create_tool_output_message(state, call, output)]
-        _ -> messages
-      end
-
-    {payload, new_messages, new_context}
-  end
-
-  defp invoke_tool_function(function, args, context) when is_function(function, 2) do
-    safe_tool_invoke(fn -> function.(args, context) end)
-  end
-
-  defp invoke_tool_function(function, args, _context) when is_function(function, 1) do
-    safe_tool_invoke(fn -> function.(args) end)
-  end
-
-  defp safe_tool_invoke(fun) do
-    normalize_tool_result(fun.())
-  rescue
-    exception ->
-      normalize_tool_result({:exception, exception, __STACKTRACE__})
-  end
-
-  defp normalize_tool_result({:ok, value}) do
-    {:ok, normalize_success_value(value), %{}}
-  end
-
-  defp normalize_tool_result({:ok, value, context}) do
-    {:ok, normalize_success_value(value), ensure_context_map(context)}
-  end
-
-  defp normalize_tool_result({:error, reason}) do
-    {:error, normalize_error_value(reason), %{}}
-  end
-
-  defp normalize_tool_result({:error, reason, context}) do
-    {:error, normalize_error_value(reason), ensure_context_map(context)}
-  end
-
-  defp normalize_tool_result({:exception, exception, stacktrace}) do
-    formatted = Exception.format(:error, exception, stacktrace)
-    sanitized = sanitize_exception_message(formatted)
-    {:error, error_payload("Exception raised", sanitized), %{}}
-  end
-
-  defp normalize_tool_result({value, _bindings}) do
-    normalize_tool_result(value)
-  end
-
-  defp normalize_tool_result(value) do
-    {:ok, normalize_success_value(value), %{}}
-  end
-
-  defp normalize_success_value(value) when is_struct(value) do
-    if ecto_changeset?(value) do
-      error_payload("Validation failed", format_changeset_errors(value))
-    else
-      inspect(value)
-    end
-  end
-
-  defp normalize_success_value(value) when is_binary(value), do: value
-  defp normalize_success_value(value) when is_map(value), do: value
-  defp normalize_success_value(value), do: value
-
-  defp normalize_error_value(reason) do
-    error_payload("Operation failed", reason)
-  end
-
-  defp ensure_context_map(nil), do: %{}
-  defp ensure_context_map(map) when is_map(map), do: map
-
-  defp ensure_context_map(keyword) when is_list(keyword) do
-    if Keyword.keyword?(keyword) do
-      Map.new(keyword)
-    else
-      raise ArgumentError, "tool context patch must be a map, got: #{inspect(keyword)}"
-    end
-  end
-
-  defp ensure_context_map(other) do
-    raise ArgumentError, "tool context patch must be a map, got: #{inspect(other)}"
-  end
-
-  defp error_payload(header, reason) do
-    [header, render_reason(reason)]
-    |> Enum.reject(&(&1 in [nil, ""]))
-    |> Enum.join("\n")
-  end
-
-  defp render_reason(reason) do
-    cond do
-      ecto_changeset?(reason) -> format_changeset_errors(reason)
-      is_binary(reason) -> reason
-      is_struct(reason) -> inspect(reason)
-      is_map(reason) -> inspect(reason)
-      is_list(reason) -> inspect(reason)
-      true -> inspect(reason)
-    end
-  end
-
-  defp ecto_changeset?(%{__struct__: struct}) do
-    ecto_changeset_module = Module.concat(Ecto, Changeset)
-    struct == ecto_changeset_module and Code.ensure_loaded?(ecto_changeset_module)
-  rescue
-    ArgumentError -> false
-  end
-
-  defp ecto_changeset?(_), do: false
-
-  defp format_changeset_errors(changeset) do
-    module = Module.concat(Ecto, Changeset)
-
-    if Code.ensure_loaded?(module) and function_exported?(module, :traverse_errors, 2) do
-      errors =
-        module.traverse_errors(changeset, fn {msg, opts} ->
-          Enum.reduce(opts, msg, fn {key, value}, acc ->
-            String.replace(acc, "%{#{key}}", format_changeset_value(value))
-          end)
-        end)
-
-      if Enum.empty?(errors) do
-        inspect(changeset)
-      else
-        Enum.map_join(errors, "\n", fn {field, messages} ->
-          field_name =
-            field
-            |> to_string()
-            |> String.replace("_", " ")
-            |> String.trim()
-            |> String.capitalize()
-
-          formatted_messages = messages |> List.wrap() |> Enum.map_join(", ", &to_string/1)
-
-          "#{field_name}: #{formatted_messages}"
-        end)
-      end
-    else
-      inspect(changeset)
-    end
-  end
-
-  defp format_changeset_value(value) when is_binary(value), do: value
-  defp format_changeset_value(value) when is_atom(value), do: Atom.to_string(value)
-  defp format_changeset_value(value) when is_integer(value), do: Integer.to_string(value)
-  defp format_changeset_value(value) when is_float(value), do: Float.to_string(value)
-
-  defp format_changeset_value({:array, type}) do
-    "array of #{format_changeset_value(type)}"
-  end
-
-  defp format_changeset_value(value) when is_tuple(value) do
-    value |> Tuple.to_list() |> Enum.map_join(" ", &format_changeset_value/1)
-  end
-
-  defp format_changeset_value(value), do: inspect(value)
-
-  @doc false
-  # Sanitizes exception messages to remove non-deterministic elements like PIDs,
-  # user IDs, timestamps, email addresses, and test-generated names/slugs.
-  # This ensures cassette stability when exceptions occur during testing.
-  defp sanitize_exception_message(message) when is_binary(message) do
-    message
-    |> String.replace(~r/#PID<\d+\.\d+\.\d+>/, "#PID<0.0.0>")
-    |> String.replace(~r/user-\d+@example\.com/, "user-N@example.com")
-    |> String.replace(~r/id: \d+/, "id: N")
-    |> String.replace(~r/~N\[[^\]]+\]/, "~N[TIMESTAMP]")
-    |> String.replace(~r/#Reference<[^>]+>/, "#Reference<REDACTED>")
-    |> String.replace(~r/name: "org\d+"/, "name: \"orgN\"")
-    |> String.replace(~r/slug: "org\d+"/, "slug: \"orgN\"")
-  end
-
-  defp sanitize_exception_message(message), do: message
-
-  defp parse_args(nil), do: %{}
-
-  defp parse_args(fragment) when is_binary(fragment) do
-    case Jason.decode(fragment) do
-      {:ok, value} -> value
-      {:error, error} -> raise ArgumentError, "invalid tool args: #{inspect(error)}"
     end
   end
 
   defp build_request(%State{} = state), do: build_request(state, true)
 
   defp build_request(%State{} = state, stream?) do
+    endpoint_impl = get_endpoint_impl(state)
+
     %{
       endpoint: state.endpoint,
-      url: build_url(state),
+      url: endpoint_impl.build_url(state),
       headers: build_headers(state.api_key),
-      body: build_body(state, stream?),
+      body: endpoint_impl.build_body(state, stream?),
       opts: http_opts(state)
     }
-  end
-
-  defp build_body(%State{endpoint: :chat} = state, stream?) do
-    # Convert instructions to system message for Chat Completions API
-    messages =
-      if state.instructions do
-        [Message.new(:system, state.instructions) | state.messages]
-      else
-        state.messages
-      end
-
-    base = %{
-      model: state.model,
-      messages: Enum.map(messages, &Message.to_chat_map/1),
-      stream: stream?
-    }
-
-    base =
-      if state.tool_defs == [] do
-        base
-      else
-        base
-        |> Map.put(:tools, state.tool_defs)
-        |> Map.put(:tool_choice, encode_tool_choice(state.tool_choice))
-      end
-
-    maybe_put(base, :metadata, metadata_for_request(state))
-  end
-
-  defp build_body(%State{endpoint: :responses} = state, stream?) do
-    # For Responses API, tool outputs are added to the input array as function_call_output items
-    input_items = Enum.map(state.messages, &message_to_response/1)
-
-    input_items_with_tool_outputs =
-      if state.tool_payloads != [] do
-        input_items ++ Enum.map(state.tool_payloads, &tool_payload_to_function_call_output/1)
-      else
-        input_items
-      end
-
-    base = %{
-      model: state.model,
-      input: input_items_with_tool_outputs,
-      stream: stream?
-    }
-
-    # Always include tools if available
-    base =
-      if state.tool_defs != [] do
-        Map.put(base, :tools, transform_tools_for_responses_api(state.tool_defs))
-      else
-        base
-      end
-
-    base
-    |> maybe_put(:metadata, metadata_for_request(state))
-    |> maybe_put(:instructions, state.instructions)
-    |> maybe_put(:previous_response_id, state.response_id || state.previous_response_id)
-    |> maybe_put(:reasoning, state.reasoning)
-    |> maybe_put(:store, state.store)
-  end
-
-  @doc false
-  # Transforms function tools to Responses API format.
-  # The Responses API expects a flat structure with name/description/parameters at root level:
-  #   {"type": "function", "name": "calc", "description": "...", "parameters": {...}}
-  #
-  # Chat Completions API uses nested structure (for Mistral compatibility):
-  #   {"type": "function", "function": {"name": "calc", "description": "...", "parameters": {...}}}
-  #
-  # This function flattens the nested function object for Responses API compatibility.
-  defp transform_tools_for_responses_api(tool_defs) do
-    Enum.map(tool_defs, fn tool ->
-      # Extract nested function object (could be atom or string key)
-      function = Map.get(tool, :function) || Map.get(tool, "function")
-
-      if function do
-        # Flatten: move function.name, function.description, function.parameters to root level
-        name = Map.get(function, :name) || Map.get(function, "name")
-        description = Map.get(function, :description) || Map.get(function, "description")
-        parameters = Map.get(function, :parameters) || Map.get(function, "parameters")
-
-        tool
-        |> Map.delete(:function)
-        |> Map.delete("function")
-        |> maybe_put(:name, name)
-        |> maybe_put(:description, description)
-        |> maybe_put(:parameters, parameters)
-      else
-        # Non-function tools (e.g., code_interpreter, file_search) pass through unchanged
-        tool
-      end
-    end)
-  end
-
-  # Converts tool payload to function_call_output format for Responses API
-  defp tool_payload_to_function_call_output(%{call_id: call_id, output: output}) do
-    %{
-      type: "function_call_output",
-      call_id: call_id,
-      output: output
-    }
-  end
-
-  defp metadata_for_request(%State{} = state) do
-    case normalize_metadata_for_request(state.metadata) do
-      nil ->
-        nil
-
-      metadata ->
-        if store_enabled?(state.store) do
-          metadata
-        else
-          log_metadata_drop(state, metadata)
-          nil
-        end
-    end
-  end
-
-  defp normalize_metadata_for_request(nil), do: nil
-
-  defp normalize_metadata_for_request(%{} = metadata) do
-    if map_size(metadata) == 0, do: nil, else: metadata
-  end
-
-  defp normalize_metadata_for_request(metadata), do: metadata
-
-  defp store_enabled?(value), do: value in [true, true, "true"]
-
-  defp log_metadata_drop(%State{} = state, metadata) do
-    Logger.warning(
-      "Dropping metadata for #{state.model} #{inspect(state.endpoint)} request because :store is not enabled. " <>
-        "Set :store to true to persist metadata. Metadata: #{inspect(metadata)}"
-    )
-  end
-
-  defp message_to_response(%Message{role: role, content: content})
-       when is_binary(content) or is_list(content) do
-    %{
-      role: Atom.to_string(role),
-      content: [response_text_part(role, content)]
-    }
-  end
-
-  defp message_to_response(%Message{role: role, content: content}) when is_map(content) do
-    %{
-      role: Atom.to_string(role),
-      content: [content]
-    }
-  end
-
-  defp response_text_part(role, content) do
-    type =
-      case role do
-        :assistant -> "output_text"
-        :function -> "output_text"
-        _ -> "input_text"
-      end
-
-    %{type: type, text: IO.iodata_to_binary(content)}
-  end
-
-  defp build_url(%State{endpoint: :chat, base_url: base}) do
-    trimmed = String.trim_trailing(base, "/")
-    trimmed <> "/chat/completions"
-  end
-
-  defp build_url(%State{endpoint: :responses, base_url: base}) do
-    trimmed = String.trim_trailing(base, "/")
-    trimmed <> "/responses"
   end
 
   defp http_opts(%State{timeout: timeout, cassette: cassette, cassette_index: index}) do
@@ -1158,174 +763,8 @@ defmodule Aquila.Engine do
     raise RuntimeError, "transport error: #{inspect(reason)}"
   end
 
-  defp track_tool_call(calls, %{id: id} = event) do
-    {before, rest} = Enum.split_while(calls, &(&1.id != id))
-
-    updated =
-      case rest do
-        [%{args_fragment: fragment} = call | tail] ->
-          new_fragment = fragment <> (Map.get(event, :args_fragment, "") || "")
-
-          new_call =
-            call
-            |> Map.put(:args_fragment, new_fragment)
-            |> maybe_put(:call_id, Map.get(event, :call_id))
-            |> maybe_put(:name, Map.get(event, :name))
-
-          before ++ [new_call | tail]
-
-        [] ->
-          call = %{
-            id: id,
-            name: Map.get(event, :name),
-            args_fragment: Map.get(event, :args_fragment, "") || "",
-            call_id: Map.get(event, :call_id),
-            status: :collecting
-          }
-
-          calls ++ [call]
-      end
-
-    updated
-  end
-
-  defp finalize_tool_call(calls, %{id: id} = event) do
-    Enum.map(calls, fn
-      %{id: ^id} = call ->
-        args = Map.get(event, :args) || parse_args(call.args_fragment)
-
-        call
-        |> Map.put(:args, args)
-        |> maybe_put(:call_id, Map.get(event, :call_id))
-        |> Map.put(:status, :ready)
-
-      other ->
-        other
-    end)
-  end
-
-  defp finalize_all_collecting_calls(calls) do
-    Enum.map(calls, fn
-      %{status: :collecting, args_fragment: fragment} = call when fragment != "" ->
-        args = parse_args(fragment)
-
-        call
-        |> Map.put(:args, args)
-        |> Map.put(:status, :ready)
-
-      %{status: :collecting} = call ->
-        # Empty args fragment, use empty map
-        call
-        |> Map.put(:args, %{})
-        |> Map.put(:status, :ready)
-
-      other ->
-        other
-    end)
-  end
-
-  defp append_tool_meta(meta, ready_calls) do
-    tool_info = Enum.map(ready_calls, &Map.take(&1, [:id, :name, :call_id]))
-    Map.update(meta, :tool_calls, tool_info, fn existing -> existing ++ tool_info end)
-  end
-
-  defp merge_tool_context(current, patch) when patch == %{}, do: current
-  defp merge_tool_context(nil, patch), do: patch
-
-  defp merge_tool_context(current, patch) when is_map(current) do
-    Map.merge(current, patch, fn _key, _old, new -> new end)
-  end
-
-  defp merge_tool_context(current, patch) when is_list(current) do
-    if Keyword.keyword?(current) do
-      current
-      |> Map.new()
-      |> Map.merge(patch, fn _key, _old, new -> new end)
-    else
-      patch
-    end
-  end
-
-  defp merge_tool_context(_current, patch), do: patch
-
-  defp empty_map_to_nil(%{} = map) when map_size(map) == 0, do: nil
-  defp empty_map_to_nil(other), do: other
-
-  defp normalize_tool_output(output) when is_binary(output), do: output
-
-  defp normalize_tool_output(output) when is_map(output) do
-    Jason.encode!(output)
-  end
-
-  defp normalize_tool_output(other) do
-    Jason.encode!(%{result: other})
-  end
-
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
-
-  # Creates a tool output message, using the appropriate role based on model capabilities.
-  # Tries tool role first (newer format), falls back to function role if needed.
-  defp create_tool_output_message(state, call, output) do
-    tool_output_message_for_state(state, call.name, call.call_id || call.id, output)
-  end
-
-  defp tool_output_message_for_state(state, name, call_id, output) do
-    if should_use_tool_role?(state) do
-      Message.tool_output_message(
-        name,
-        output,
-        tool_call_id: call_id,
-        format: tool_message_format(state)
-      )
-    else
-      Message.function_message(name, output)
-    end
-  end
-
-  defp maybe_append_assistant_tool_call(%State{endpoint: :chat}, messages, call) do
-    append_assistant_tool_call_message(messages, call)
-  end
-
-  defp maybe_append_assistant_tool_call(_state, messages, _call), do: messages
-
-  defp append_assistant_tool_call_message(messages, call) do
-    call_id = call.call_id || call.id
-
-    already_present =
-      Enum.any?(messages, fn
-        %Message{role: :assistant, tool_calls: tool_calls} when is_list(tool_calls) ->
-          Enum.any?(tool_calls, &tool_call_matches?(&1, call_id))
-
-        _ ->
-          false
-      end)
-
-    args_map = extract_tool_call_args(call)
-
-    if already_present do
-      messages
-    else
-      entry = %{
-        "id" => call_id,
-        "type" => "function",
-        "function" => %{
-          "name" => call.name,
-          "arguments" => encode_tool_arguments(args_map)
-        }
-      }
-
-      messages ++ [Message.new(:assistant, "", tool_calls: [entry])]
-    end
-  end
-
-  defp tool_call_matches?(%{"id" => id}, call_id), do: id == call_id
-  defp tool_call_matches?(%{id: id}, call_id), do: id == call_id
-  defp tool_call_matches?(_, _), do: false
-
-  defp encode_tool_arguments(arguments) when is_binary(arguments), do: arguments
-  defp encode_tool_arguments(arguments) when is_map(arguments), do: Jason.encode!(arguments)
-  defp encode_tool_arguments(_), do: "{}"
 
   defp extract_tool_call_args(call) do
     cond do
@@ -1358,12 +797,14 @@ defmodule Aquila.Engine do
       args: tool_args
     )
 
+    endpoint_impl = get_endpoint_impl(state)
+
     {payloads, {messages, tool_context, tool_outputs, call_history}} =
       Enum.map_reduce(
         ready_calls,
         {state.messages, state.tool_context, [], state.tool_call_history},
         fn call, {msgs, ctx, outputs, history} ->
-          msgs_with_call = maybe_append_assistant_tool_call(state, msgs, call)
+          msgs_with_call = endpoint_impl.maybe_append_assistant_tool_call(state, msgs, call)
           args = extract_tool_call_args(call)
 
           Sink.notify(
@@ -1372,8 +813,8 @@ defmodule Aquila.Engine do
             state.ref
           )
 
-          output_text = loop_error_output(call, args)
-          normalized_output = normalize_tool_output(output_text)
+          output_text = Shared.loop_error_output(call, args)
+          normalized_output = Shared.normalize_tool_output(output_text)
 
           Sink.notify(
             state.sink,
@@ -1390,22 +831,14 @@ defmodule Aquila.Engine do
             state.ref
           )
 
+          # Use endpoint-specific tool output appending
           new_messages =
-            case state.endpoint do
-              :chat ->
-                msgs_with_call ++
-                  [
-                    tool_output_message_for_state(
-                      state,
-                      call.name,
-                      call.call_id || call.id,
-                      normalized_output
-                    )
-                  ]
-
-              _ ->
-                msgs
-            end
+            endpoint_impl.append_tool_output_message(
+              state,
+              msgs_with_call,
+              call,
+              normalized_output
+            )
 
           payload = %{
             id: call.id,
@@ -1430,43 +863,23 @@ defmodule Aquila.Engine do
     payloads = Enum.reverse(payloads)
     tool_outputs = Enum.reverse(tool_outputs)
 
+    # Use endpoint-specific handler for tool outputs
     updated_state =
-      case state.endpoint do
-        :responses -> %{state | tool_payloads: payloads}
-        :chat -> %{state | messages: messages}
-      end
+      endpoint_impl.handle_tool_outputs(
+        state,
+        payloads,
+        messages,
+        tool_context,
+        tool_outputs,
+        call_history
+      )
 
     %{
       updated_state
       | pending_calls: pending_calls,
         status: :in_progress,
-        final_meta: append_tool_meta(state.final_meta, ready_calls),
-        tool_context: tool_context,
-        last_tool_outputs: tool_outputs,
-        tool_call_history: call_history
+        final_meta: Shared.append_tool_meta(state.final_meta, ready_calls)
     }
-  end
-
-  defp loop_error_output(call, args) do
-    rendered_args = render_loop_args(args)
-
-    [
-      "Tool loop detected for ",
-      call.name,
-      ". This call was blocked because the same arguments were invoked repeatedly. ",
-      "Update the prompt or adjust the tool to return new information before calling it again.",
-      "\nArguments: ",
-      rendered_args
-    ]
-    |> IO.iodata_to_binary()
-  end
-
-  defp render_loop_args(args) when is_map(args) do
-    inspect(args, limit: 10, printable_limit: 200)
-  end
-
-  defp render_loop_args(args) do
-    inspect(args, limit: 10, printable_limit: 200)
   end
 
   # Detects if we're in a tool call loop (same tool being called repeatedly with same args).
@@ -1498,12 +911,6 @@ defmodule Aquila.Engine do
 
   defp loop_detection_disabled?(_), do: false
 
-  defp tool_message_format(%State{tool_message_format: format})
-       when format in [:text, :tool_result],
-       do: format
-
-  defp tool_message_format(_), do: :text
-
   defp normalize_tool_choice(choice) do
     case choice do
       :auto -> :auto
@@ -1518,22 +925,6 @@ defmodule Aquila.Engine do
       _ -> :auto
     end
   end
-
-  defp encode_tool_choice(:auto), do: "auto"
-  defp encode_tool_choice(:required), do: "required"
-
-  defp encode_tool_choice({:function, name}) when is_binary(name) do
-    %{"type" => "function", "function" => %{"name" => name}}
-  end
-
-  defp encode_tool_choice({:function, name}) when is_atom(name) do
-    encode_tool_choice({:function, Atom.to_string(name)})
-  end
-
-  defp encode_tool_choice(%{} = choice), do: choice
-  defp encode_tool_choice(value) when is_binary(value), do: value
-  defp encode_tool_choice(value) when is_atom(value), do: Atom.to_string(value)
-  defp encode_tool_choice(_), do: "auto"
 
   defp force_tool_choice(%State{} = state) do
     choice = compute_forced_tool_choice(state.tools)
@@ -1655,10 +1046,12 @@ defmodule Aquila.Engine do
 
     cond do
       requires_structured_tool_result?(message) and state.tool_message_format != :tool_result ->
-        {:retry, rebuild_messages_with_format(state, :tool_result)}
+        endpoint_impl = get_endpoint_impl(state)
+        {:retry, endpoint_impl.rebuild_tool_messages_for_retry(state, {:format, :tool_result})}
 
       rejects_structured_tool_result?(message) and state.tool_message_format == :tool_result ->
-        {:retry, rebuild_messages_with_format(state, :text)}
+        endpoint_impl = get_endpoint_impl(state)
+        {:retry, endpoint_impl.rebuild_tool_messages_for_retry(state, {:format, :text})}
 
       true ->
         :no_retry
@@ -1676,13 +1069,15 @@ defmodule Aquila.Engine do
       # Error indicates 'tool' role is not supported and we haven't tried function role yet
       role_not_supported?(error_message, "tool") and state.supports_tool_role != false ->
         Logger.debug("Model does not support 'tool' role, switching to 'function' role")
-        new_state = rebuild_messages_with_different_role(state, false)
+        endpoint_impl = get_endpoint_impl(state)
+        new_state = endpoint_impl.rebuild_tool_messages_for_retry(state, {:role, false})
         {:retry, new_state}
 
       # Error indicates 'function' role is not supported and we haven't tried tool role yet
       role_not_supported?(error_message, "function") and state.supports_tool_role != true ->
         Logger.debug("Model does not support 'function' role, switching to 'tool' role")
-        new_state = rebuild_messages_with_different_role(state, true)
+        endpoint_impl = get_endpoint_impl(state)
+        new_state = endpoint_impl.rebuild_tool_messages_for_retry(state, {:role, true})
         {:retry, new_state}
 
       # Either not a role error, or we've already tried both formats
@@ -1743,50 +1138,6 @@ defmodule Aquila.Engine do
     end
   end
 
-  # Rebuilds messages with a different tool role format after detecting incompatibility.
-  # This removes tool output messages and recreates them with the specified role format.
-  defp rebuild_messages_with_different_role(%State{} = state, use_tool_role) do
-    # Update the state to remember which format to use and increment retry counter
-    updated_state = %{
-      state
-      | supports_tool_role: use_tool_role,
-        error: nil,
-        role_retry_count: state.role_retry_count + 1
-    }
-
-    # Remove tool output messages (function or tool role) that were added in the last round
-    cleaned_messages =
-      Enum.reject(updated_state.messages, fn msg ->
-        msg.role in [:function, :tool]
-      end)
-
-    # Recreate tool output messages with the new format using stored outputs
-    new_tool_messages =
-      Enum.map(updated_state.last_tool_outputs, fn %{call_id: call_id, name: name, output: output} ->
-        tool_output_message_for_state(updated_state, name, call_id, output)
-      end)
-
-    rebuilt_messages = cleaned_messages ++ new_tool_messages
-
-    %{updated_state | messages: rebuilt_messages}
-  end
-
-  defp rebuild_messages_with_format(%State{} = state, format) do
-    updated_state = %{state | tool_message_format: format, error: nil}
-
-    cleaned_messages =
-      Enum.reject(updated_state.messages, fn msg ->
-        msg.role in [:function, :tool]
-      end)
-
-    new_tool_messages =
-      Enum.map(updated_state.last_tool_outputs, fn %{call_id: call_id, name: name, output: output} ->
-        tool_output_message_for_state(updated_state, name, call_id, output)
-      end)
-
-    %{updated_state | messages: cleaned_messages ++ new_tool_messages}
-  end
-
   defp requires_structured_tool_result?(message) do
     String.contains?(message, "unexpected `tool_use_id`") or
       String.contains?(message, "must have a corresponding `tool_use` block") or
@@ -1799,12 +1150,4 @@ defmodule Aquila.Engine do
   defp rejects_structured_tool_result?(message) do
     String.contains?(message, "Invalid value: 'tool_result'")
   end
-
-  # Determines whether to use the 'tool' role based on detection state.
-  # Defaults to the newer tool role unless we've already proven it fails.
-  defp should_use_tool_role?(%State{supports_tool_role: nil}), do: true
-  # Known to work
-  defp should_use_tool_role?(%State{supports_tool_role: true}), do: true
-  # Known to fail
-  defp should_use_tool_role?(%State{supports_tool_role: false}), do: false
 end
