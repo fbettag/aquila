@@ -65,8 +65,12 @@ defmodule Aquila.DeepResearchLiveTest do
 
   defp collect_research_events_from_mailbox(ref, events \\ []) do
     receive do
-      {:aquila_event, %{"payload" => %{"source" => "deep_research"}}, ^ref} = msg ->
-        collect_research_events_from_mailbox(ref, [msg | events])
+      {:aquila_event, payload, ^ref} = msg when is_map(payload) ->
+        if deep_research_payload?(payload) do
+          collect_research_events_from_mailbox(ref, [msg | events])
+        else
+          collect_research_events_from_mailbox(ref, events)
+        end
 
       {:aquila_chunk, _chunk, ^ref} ->
         collect_research_events_from_mailbox(ref, events)
@@ -81,12 +85,45 @@ defmodule Aquila.DeepResearchLiveTest do
         collect_research_events_from_mailbox(ref, events)
 
       {:aquila_event, _other_event, ^ref} ->
-        # Non-deep-research events, skip them
         collect_research_events_from_mailbox(ref, events)
     after
       0 -> Enum.reverse(events)
     end
   end
+
+  defp deep_research_payload?(payload) do
+    source =
+      get_in_payload(payload, ["payload", "source"]) ||
+        get_in_payload(payload, [:payload, :source]) ||
+        get_in_payload(payload, ["source"]) ||
+        get_in_payload(payload, [:source])
+
+    case source do
+      value when is_atom(value) -> value == :deep_research
+      value when is_binary(value) -> value == "deep_research"
+      _ -> false
+    end
+  end
+
+  defp get_in_payload(value, []), do: value
+
+  defp get_in_payload(payload, [key | rest]) when is_map(payload) do
+    cond do
+      Map.has_key?(payload, key) ->
+        get_in_payload(Map.get(payload, key), rest)
+
+      is_atom(key) and Map.has_key?(payload, Atom.to_string(key)) ->
+        get_in_payload(Map.get(payload, Atom.to_string(key)), rest)
+
+      is_binary(key) and Map.has_key?(payload, String.to_atom(key)) ->
+        get_in_payload(Map.get(payload, String.to_atom(key)), rest)
+
+      true ->
+        nil
+    end
+  end
+
+  defp get_in_payload(_other, _rest), do: nil
 
   defp flush_stream_messages(ref) do
     receive do

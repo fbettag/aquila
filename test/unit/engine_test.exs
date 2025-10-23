@@ -20,6 +20,8 @@ defmodule Aquila.EngineTest do
   alias Aquila.Message
   alias Aquila.Tool
 
+  @silent_transport __MODULE__.SilentTransport
+
   defmodule RoleCompatibilityTransport do
     @behaviour Aquila.Transport
 
@@ -85,6 +87,35 @@ defmodule Aquila.EngineTest do
     end
   end
 
+  describe "store flag defaults" do
+    test "responses endpoint leaves store unset by default" do
+      cleanup = fn ->
+        Process.delete(:silent_round)
+        Process.delete(:silent_requests)
+      end
+
+      cleanup.()
+      on_exit(cleanup)
+
+      Engine.run("ping",
+        transport: @silent_transport,
+        endpoint: :responses,
+        model: "openai/gpt-4o"
+      )
+
+      [request | _] =
+        Process.get(:silent_requests, [])
+        |> Enum.reverse()
+
+      body = Map.get(request, :body) || Map.get(request, "body")
+
+      refute Map.has_key?(body, :store)
+      refute Map.has_key?(body, "store")
+      assert Map.get(body, :store) == nil
+      assert Map.get(body, "store") == nil
+    end
+  end
+
   defmodule SilentTransport do
     @behaviour Aquila.Transport
 
@@ -107,6 +138,84 @@ defmodule Aquila.EngineTest do
 
       callback.(%{type: :done, status: :completed})
       {:ok, make_ref()}
+    end
+  end
+
+  describe "metadata handling" do
+    setup do
+      cleanup = fn ->
+        Process.delete(:silent_round)
+        Process.delete(:silent_requests)
+      end
+
+      cleanup.()
+      on_exit(cleanup)
+      :ok
+    end
+
+    test "omits metadata when store is disabled for chat endpoint" do
+      Engine.run("ping",
+        transport: @silent_transport,
+        endpoint: :chat,
+        model: "openai/gpt-4o",
+        metadata: %{foo: "bar"}
+      )
+
+      [request | _] =
+        Process.get(:silent_requests, [])
+        |> Enum.reverse()
+
+      body = Map.get(request, :body) || Map.get(request, "body")
+      metadata = Map.get(body, :metadata) || Map.get(body, "metadata")
+      store = Map.get(body, :store) || Map.get(body, "store")
+
+      assert is_nil(metadata)
+      assert is_nil(store)
+      refute Map.has_key?(body, :store)
+      refute Map.has_key?(body, "store")
+    end
+
+    test "omits metadata when store is disabled for responses endpoint" do
+      Engine.run("ping",
+        transport: @silent_transport,
+        endpoint: :responses,
+        model: "openai/gpt-4o",
+        metadata: %{foo: "bar"}
+      )
+
+      [request | _] =
+        Process.get(:silent_requests, [])
+        |> Enum.reverse()
+
+      body = Map.get(request, :body) || Map.get(request, "body")
+      metadata = Map.get(body, :metadata) || Map.get(body, "metadata")
+      store = Map.get(body, :store) || Map.get(body, "store")
+
+      assert is_nil(metadata)
+      assert is_nil(store)
+      refute Map.has_key?(body, :store)
+      refute Map.has_key?(body, "store")
+    end
+
+    test "sends metadata when store is enabled" do
+      Engine.run("ping",
+        transport: @silent_transport,
+        endpoint: :responses,
+        model: "openai/gpt-4o",
+        metadata: %{foo: "bar"},
+        store: true
+      )
+
+      [request | _] =
+        Process.get(:silent_requests, [])
+        |> Enum.reverse()
+
+      body = Map.get(request, :body) || Map.get(request, "body")
+      store = Map.get(body, :store) || Map.get(body, "store")
+      metadata = Map.get(body, :metadata) || Map.get(body, "metadata")
+
+      assert store == true
+      assert metadata == %{foo: "bar"}
     end
   end
 

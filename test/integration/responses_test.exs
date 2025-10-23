@@ -139,4 +139,24 @@ defmodule Aquila.ResponsesHelperTest do
 
     assert {"authorization", "Bearer test_key_value"} in headers
   end
+
+  test "Aquila.ask with responses endpoint does not set store by default" do
+    response =
+      Aquila.ask("ping",
+        model: "openai/gpt-4o",
+        endpoint: :responses,
+        transport: Aquila.CaptureTransport
+      )
+
+    assert response.text == ""
+
+    assert_receive {:stream_request, req}
+
+    body = Map.get(req, :body) || Map.get(req, "body")
+
+    refute Map.has_key?(body, :store)
+    refute Map.has_key?(body, "store")
+    assert Map.get(body, :store) == nil
+    assert Map.get(body, "store") == nil
+  end
 end

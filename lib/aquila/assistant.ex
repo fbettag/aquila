@@ -118,7 +118,7 @@ defmodule Aquila.Assistant do
       |> Aquila.Assistant.with_model("gpt-4o")
   """
   def with_model(%__MODULE__{} = assistant, model) when is_binary(model) do
-    %{assistant | model: model, endpoint: assistant.endpoint || :chat}
+    %{assistant | model: model}
   end
 
   def with_model(%__MODULE__{} = assistant, model) when is_atom(model) do

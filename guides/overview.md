@@ -39,7 +39,8 @@ cleanly inside background processors such as Oban without any custom wrappers.
 ## Key Modules
 
 - `Aquila` – developer-facing API for `ask/2`, `stream/2`,
-  `retrieve_response/2`, `delete_response/2`, and `transcribe_audio/2`.
+  `retrieve_response/2`, `delete_response/2`, `transcribe_audio/2`, and
+  `deep_research_*` helpers.
 - `Aquila.Engine` – internal orchestrator that normalises events, manages tool
   invocations, and reports telemetry.
 - `Aquila.Transport.*` – adapters for real HTTP (`OpenAI`), auto-recording

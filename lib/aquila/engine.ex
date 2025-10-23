@@ -677,7 +677,7 @@ defmodule Aquila.Engine do
         |> Map.put(:tool_choice, encode_tool_choice(state.tool_choice))
       end
 
-    Map.put(base, :metadata, state.metadata)
+    maybe_put(base, :metadata, metadata_for_request(state))
   end
 
   defp build_body(%State{endpoint: :responses} = state, stream?) do
@@ -694,7 +694,6 @@ defmodule Aquila.Engine do
     base = %{
       model: state.model,
       input: input_items_with_tool_outputs,
-      metadata: state.metadata,
       stream: stream?
     }
 
@@ -707,6 +706,7 @@ defmodule Aquila.Engine do
       end
 
     base
+    |> maybe_put(:metadata, metadata_for_request(state))
     |> maybe_put(:instructions, state.instructions)
     |> maybe_put(:previous_response_id, state.response_id || state.previous_response_id)
     |> maybe_put(:reasoning, state.reasoning)
@@ -753,6 +753,38 @@ defmodule Aquila.Engine do
       call_id: call_id,
       output: output
     }
+  end
+
+  defp metadata_for_request(%State{} = state) do
+    case normalize_metadata_for_request(state.metadata) do
+      nil ->
+        nil
+
+      metadata ->
+        if store_enabled?(state.store) do
+          metadata
+        else
+          log_metadata_drop(state, metadata)
+          nil
+        end
+    end
+  end
+
+  defp normalize_metadata_for_request(nil), do: nil
+
+  defp normalize_metadata_for_request(%{} = metadata) do
+    if map_size(metadata) == 0, do: nil, else: metadata
+  end
+
+  defp normalize_metadata_for_request(metadata), do: metadata
+
+  defp store_enabled?(value), do: value in [true, true, "true"]
+
+  defp log_metadata_drop(%State{} = state, metadata) do
+    Logger.warning(
+      "Dropping metadata for #{state.model} #{inspect(state.endpoint)} request because :store is not enabled. " <>
+        "Set :store to true to persist metadata. Metadata: #{inspect(metadata)}"
+    )
   end
 
   defp message_to_response(%Message{role: role, content: content})
@@ -1252,7 +1284,15 @@ defmodule Aquila.Engine do
 
   # Detects if we're in a tool call loop (same tool being called repeatedly with same args).
   # Returns {:loop_detected, call_signature} if loop found, :no_loop otherwise.
-  defp detect_tool_loop(%State{tool_call_history: history}, ready_calls) do
+  defp detect_tool_loop(%State{tool_call_history: history, tool_context: context}, ready_calls) do
+    if loop_detection_disabled?(context) do
+      :no_loop
+    else
+      do_detect_tool_loop(history, ready_calls)
+    end
+  end
+
+  defp do_detect_tool_loop(history, ready_calls) do
     # Get signatures of calls we're about to make
     new_signatures = Enum.map(ready_calls, fn call -> {call.name, call.args} end)
 
@@ -1262,6 +1302,14 @@ defmodule Aquila.Engine do
       if recent_count >= 2, do: {:loop_detected, signature}, else: nil
     end)
   end
+
+  defp loop_detection_disabled?(context) when is_map(context) do
+    Map.get(context, :disable_loop_detection) ||
+      Map.get(context, "disable_loop_detection") ||
+      false
+  end
+
+  defp loop_detection_disabled?(_), do: false
 
   defp tool_message_format(%State{tool_message_format: format})
        when format in [:text, :tool_result],

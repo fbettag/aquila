@@ -44,9 +44,14 @@ defmodule Aquila.Transport.Body do
   defp normalize_map(map) do
     map
     |> Enum.map(fn {key, value} -> {normalize_key(key), normalize(value)} end)
+    |> Enum.reject(&drop_empty_metadata?/1)
     |> Enum.sort_by(&elem(&1, 0))
     |> Map.new()
   end
+
+  defp drop_empty_metadata?({"metadata", value}) when value in [%{}, nil], do: true
+  defp drop_empty_metadata?({:metadata, value}) when value in [%{}, nil], do: true
+  defp drop_empty_metadata?(_), do: false
 
   defp normalize_key(key) when is_atom(key), do: Atom.to_string(key)
   defp normalize_key(key), do: key

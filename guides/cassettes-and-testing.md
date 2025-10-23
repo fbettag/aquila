@@ -39,7 +39,7 @@ config :aquila, :recorder,
 ```elixir
 use Aquila.Cassette
 
-@test "streams deterministic chunks" do
+test "streams deterministic chunks" do
   aquila_cassette "greetings" do
     {:ok, ref} = Aquila.stream("hello")
     assert_receive {:aquila_chunk, chunk, ^ref}

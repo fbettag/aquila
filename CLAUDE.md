@@ -47,7 +47,7 @@ mix docs                  # Generate HTML docs in _build/dev/lib/aquila/doc
 
 ### Key Modules
 
-- **`Aquila.Engine`**: Internal orchestration loop. Converts inputs to messages, streams via transport, tracks tool calls, executes callbacks, and hydrates `%Aquila.Response{}`. Supports both Responses API (preferred) and Chat Completions fallback.
+- **`Aquila.Engine`**: Internal orchestration loop. Converts inputs to messages, streams via transport, tracks tool calls, executes callbacks, and hydrates `%Aquila.Response{}`. Supports both Responses API and Chat Completions (default).
 - **`Aquila.Message`**: Represents user/assistant/system/function messages. Normalized from strings or lists via `Message.normalize/2`.
 - **`Aquila.Tool`**: Wraps callable functions with JSON Schema parameters. Engine decodes args, invokes callbacks, and feeds output back to model.
 - **`Aquila.Sink`**: Protocol for streaming destinations. Built-in implementations: `pid/2` (send tuples to process), `fun/1` (callback), `collector/1` (test assertions).
@@ -95,9 +95,9 @@ Tests use `aquila_cassette/3` macro (from `Aquila.Cassette`) to assign cassette 
 ### Endpoints: Responses vs Chat Completions
 
 `Aquila.Endpoint.choose/1` selects API based on model name patterns and explicit `:endpoint` option:
-- Deep Research models (`o1`, `o3`, `o4`) → `:responses`
+- Deep Research models (e.g., `openai/o3-deep-research-2025-06-26`) → `:responses`
 - Explicit `endpoint: :chat` or `endpoint: :responses` in options
-- Otherwise, default behavior based on model capabilities
+- Otherwise, defaults to `:chat` endpoint
 
 **Responses API** (`/responses`):
 - Tools use `previous_response_id` + `tool_outputs` for continuation

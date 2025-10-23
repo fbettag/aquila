@@ -1,24 +1,25 @@
 {"content":"I","request_id":1,"type":"delta"}
 {"content":"'ll","request_id":1,"type":"delta"}
 {"content":" help","request_id":1,"type":"delta"}
-{"content":" you calculate 2+","request_id":1,"type":"delta"}
-{"content":"2 using the calculator","request_id":1,"type":"delta"}
-{"content":" tool.","request_id":1,"type":"delta"}
+{"content":" you calculate","request_id":1,"type":"delta"}
+{"content":" 2+2 ","request_id":1,"type":"delta"}
+{"content":"using the calculator tool.","request_id":1,"type":"delta"}
 {"content":"","request_id":1,"type":"delta"}
-{"args_fragment":"","call_id":"toolu_011B4wmg6p1a962FJrV2b8Xh","id":"toolu_011B4wmg6p1a962FJrV2b8Xh","name":"calculator","request_id":1,"type":"tool_call"}
+{"args_fragment":"","call_id":"toolu_01AR3C9Avaxb2FHsV4Tjf2HB","id":"toolu_01AR3C9Avaxb2FHsV4Tjf2HB","name":"calculator","request_id":1,"type":"tool_call"}
 {"content":"","request_id":1,"type":"delta"}
-{"args_fragment":"","call_id":"toolu_011B4wmg6p1a962FJrV2b8Xh","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"","call_id":"toolu_01AR3C9Avaxb2FHsV4Tjf2HB","id":null,"name":null,"request_id":1,"type":"tool_call"}
 {"content":"","request_id":1,"type":"delta"}
-{"args_fragment":"{\"expressio","call_id":"toolu_011B4wmg6p1a962FJrV2b8Xh","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"{\"express","call_id":"toolu_01AR3C9Avaxb2FHsV4Tjf2HB","id":null,"name":null,"request_id":1,"type":"tool_call"}
 {"content":"","request_id":1,"type":"delta"}
-{"args_fragment":"n\": ","call_id":"toolu_011B4wmg6p1a962FJrV2b8Xh","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"content":"","request_id":1,"type":"delta"}
-{"args_fragment":"\"2+2\"}","call_id":"toolu_011B4wmg6p1a962FJrV2b8Xh","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args":{"expression":"2+2"},"call_id":"toolu_011B4wmg6p1a962FJrV2b8Xh","id":"toolu_011B4wmg6p1a962FJrV2b8Xh","name":"calculator","request_id":1,"type":"tool_call_end"}
-{"meta":{"id":"chatcmpl-d913f70b-6d3b-4fa5-be3d-249df2fe904d","model":"claude-3-5-sonnet-latest","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
+{"args_fragment":"ion\": \"2+2\"}","call_id":"toolu_01AR3C9Avaxb2FHsV4Tjf2HB","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args":{"expression":"2+2"},"call_id":"toolu_01AR3C9Avaxb2FHsV4Tjf2HB","id":"toolu_01AR3C9Avaxb2FHsV4Tjf2HB","name":"calculator","request_id":1,"type":"tool_call_end"}
+{"meta":{"id":"chatcmpl-3f1e4bed-94e3-48a1-af90-88a46ba34612","model":"claude-3-5-sonnet-latest","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
 {"meta":null,"request_id":1,"status":"completed","type":"done"}
-{"content":"The calculator tool shows","request_id":2,"type":"delta"}
-{"content":" that 2+2","request_id":2,"type":"delta"}
-{"content":" equals 4.","request_id":2,"type":"delta"}
-{"meta":{"id":"chatcmpl-7d30df7c-7f5b-4d5e-87a5-a4708bf1896d","model":"claude-3-5-sonnet-latest"},"request_id":2,"status":"completed","type":"done"}
+{"content":"Base","request_id":2,"type":"delta"}
+{"content":"d on the calculator tool's","request_id":2,"type":"delta"}
+{"content":" result, ","request_id":2,"type":"delta"}
+{"content":"2+","request_id":2,"type":"delta"}
+{"content":"2 equals 4","request_id":2,"type":"delta"}
+{"content":".","request_id":2,"type":"delta"}
+{"meta":{"id":"chatcmpl-acc47ac7-cb96-4818-bdb4-18e8fecb964f","model":"claude-3-5-sonnet-latest"},"request_id":2,"status":"completed","type":"done"}
 {"meta":null,"request_id":2,"status":"completed","type":"done"}

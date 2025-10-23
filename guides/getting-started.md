@@ -27,17 +27,18 @@ requests, and enabling streaming output.
     config :aquila, :openai,
       api_key: System.fetch_env!("OPENAI_API_KEY"),
       base_url: "https://api.openai.com/v1",
-      default_model: "gpt-4.1-mini",
-      transcription_model: "gpt-4o-mini-transcribe"
+      default_model: "gpt-4o-mini",
+      transcription_model: "gpt-4o-mini-transcribe",
+      request_timeout: 30_000
     ```
 
 3. Configure cassette recording for tests:
 
    ```elixir
    # config/test.exs
-   config :aquila, :transport, Aquila.Transport.Record
+   config :aquila, transport: Aquila.Transport.Record
    config :aquila, :recorder,
-    path: "test/support/fixtures/aquila_cassettes",
+     path: "test/support/fixtures/aquila_cassettes",
      transport: Aquila.Transport.OpenAI
    ```
 
@@ -54,11 +55,14 @@ with textual output, usage metadata, and the raw payload.
 response =
   Aquila.ask("Explain OTP supervision trees",
     instruction: "You are a senior Elixir tutor.",
-    model: "gpt-4.1-mini"
+    model: "gpt-4o-mini"
   )
 
 IO.puts(response.text)
 ```
+
+Note: Both `:instruction` (singular) and `:instructions` (plural) are accepted
+interchangeably throughout the API.
 
 ## Streaming Requests
 

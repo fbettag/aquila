@@ -1,13 +1,13 @@
-{"args_fragment":"","call_id":"call_9wgjMOAaS78pyxv2mAE3FMnN","id":"call_9wgjMOAaS78pyxv2mAE3FMnN","name":"calculator","request_id":1,"type":"tool_call"}
-{"args_fragment":"{\"","call_id":"call_9wgjMOAaS78pyxv2mAE3FMnN","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"expression","call_id":"call_9wgjMOAaS78pyxv2mAE3FMnN","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"\":\"","call_id":"call_9wgjMOAaS78pyxv2mAE3FMnN","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"2","call_id":"call_9wgjMOAaS78pyxv2mAE3FMnN","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"+","call_id":"call_9wgjMOAaS78pyxv2mAE3FMnN","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"2","call_id":"call_9wgjMOAaS78pyxv2mAE3FMnN","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args_fragment":"\"}","call_id":"call_9wgjMOAaS78pyxv2mAE3FMnN","id":null,"name":null,"request_id":1,"type":"tool_call"}
-{"args":{"expression":"2+2"},"call_id":"call_9wgjMOAaS78pyxv2mAE3FMnN","id":"call_9wgjMOAaS78pyxv2mAE3FMnN","name":"calculator","request_id":1,"type":"tool_call_end"}
-{"meta":{"id":"chatcmpl-CT77MAILuCbNm5npBGocw2vTWF6zQ","model":"gpt-3.5-turbo","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
+{"args_fragment":"","call_id":"call_ijCHK7jPwvchgI35KT4B2zSj","id":"call_ijCHK7jPwvchgI35KT4B2zSj","name":"calculator","request_id":1,"type":"tool_call"}
+{"args_fragment":"{\"","call_id":"call_ijCHK7jPwvchgI35KT4B2zSj","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"expression","call_id":"call_ijCHK7jPwvchgI35KT4B2zSj","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"\":\"","call_id":"call_ijCHK7jPwvchgI35KT4B2zSj","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"2","call_id":"call_ijCHK7jPwvchgI35KT4B2zSj","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"+","call_id":"call_ijCHK7jPwvchgI35KT4B2zSj","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"2","call_id":"call_ijCHK7jPwvchgI35KT4B2zSj","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args_fragment":"\"}","call_id":"call_ijCHK7jPwvchgI35KT4B2zSj","id":null,"name":null,"request_id":1,"type":"tool_call"}
+{"args":{"expression":"2+2"},"call_id":"call_ijCHK7jPwvchgI35KT4B2zSj","id":"call_ijCHK7jPwvchgI35KT4B2zSj","name":"calculator","request_id":1,"type":"tool_call_end"}
+{"meta":{"id":"chatcmpl-CTnNFFMKyltjO8t4uLa6OPbXOAqj1","model":"gpt-3.5-turbo","reason":"tool_calls"},"request_id":1,"status":"requires_action","type":"done"}
 {"request_id":1,"type":"usage","usage":{"completion_tokens":16,"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":0,"rejected_prediction_tokens":0},"prompt_tokens":90,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"total_tokens":106}}
 {"meta":null,"request_id":1,"status":"completed","type":"done"}
 {"content":"The","request_id":2,"type":"delta"}
@@ -17,13 +17,12 @@
 {"content":" calculation","request_id":2,"type":"delta"}
 {"content":" ","request_id":2,"type":"delta"}
 {"content":"2","request_id":2,"type":"delta"}
-{"content":" +","request_id":2,"type":"delta"}
-{"content":" ","request_id":2,"type":"delta"}
+{"content":"+","request_id":2,"type":"delta"}
 {"content":"2","request_id":2,"type":"delta"}
 {"content":" is","request_id":2,"type":"delta"}
 {"content":" ","request_id":2,"type":"delta"}
 {"content":"4","request_id":2,"type":"delta"}
 {"content":".","request_id":2,"type":"delta"}
-{"meta":{"id":"chatcmpl-CT77NPEv8rxre1cv5JPtETIIBZOfC","model":"gpt-3.5-turbo"},"request_id":2,"status":"completed","type":"done"}
-{"request_id":2,"type":"usage","usage":{"completion_tokens":15,"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":0,"rejected_prediction_tokens":0},"prompt_tokens":118,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"total_tokens":133}}
+{"meta":{"id":"chatcmpl-CTnNGMqUO7GgBhnMAdx3odfFHCaUm","model":"gpt-3.5-turbo"},"request_id":2,"status":"completed","type":"done"}
+{"request_id":2,"type":"usage","usage":{"completion_tokens":14,"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":0,"rejected_prediction_tokens":0},"prompt_tokens":118,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"total_tokens":132}}
 {"meta":null,"request_id":2,"status":"completed","type":"done"}

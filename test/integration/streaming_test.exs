@@ -93,6 +93,9 @@ defmodule Aquila.StreamingTest do
         assert_receive {:sink_event, {:chunk, chunk}, ^ref}, 5_000
         assert is_binary(chunk)
 
+        # Wait for completion to ensure done event is delivered
+        assert {:ok, _response} = Aquila.await_stream(ref, 60_000)
+
         # Collect remaining events
         sink_events = collect_sink_events(ref, [])
         assert length(sink_events) > 0

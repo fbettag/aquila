@@ -229,6 +229,7 @@ defmodule Aquila.StreamSessionTest do
                     %{source: :deep_research, event: :output_item_added}}
   end
 
+  @tag :capture_log
   test "propagates transport errors to pubsub and persistence", %{supervisor: supervisor} do
     original_console = Application.get_env(:logger, :console, [])
     original_otp = Keyword.get(original_console, :handle_otp_reports, true)

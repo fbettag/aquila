@@ -195,8 +195,9 @@ Telemetry events fire on `[:aquila, :stream, :start | :chunk | :stop]` and
 
 The recorder transport automatically captures:
 
-- Streaming events (`<name>.sse.jsonl`)
-- Metadata (URL, headers, normalised request body) (`<name>.meta.jsonl`)
+- Streaming events (`<name>-<index>.sse.jsonl`)
+- Metadata (URL, headers, normalised request body) (`<name>-<index>.meta.json`)
+- Buffered responses for non-streaming calls (`<name>-<index>.json`)
 
 During replay, request bodies are normalised again; mismatches raise immediately with a
 list of files to delete. `Aquila.Transport.Record` powers the test suite so
@@ -219,7 +220,7 @@ provider it supports.
 ## Project Layout
 
 - `lib/aquila.ex` – public API (`ask/2`, `stream/2`, `retrieve_response/2`,
-  `delete_response/2`).
+  `delete_response/2`, `transcribe_audio/2`, `deep_research_*`).
 - `lib/aquila/engine.ex` – orchestration, streaming loop, tool integration.
 - `lib/aquila/transport/` – HTTP adapter, recorder, replay utilities.
 - `lib/aquila/sink.ex` – sink helpers for delivering streaming events.
@@ -232,20 +233,21 @@ provider it supports.
 ```shell
 mix deps.get
 mix compile
-mix quality   # format + credo
+mix quality   # format + coveralls + credo (requires ≥82% coverage)
 mix test      # requires prerecorded cassettes
 mix docs      # generate HTML docs in _build/dev/lib/aquila/doc
 ```
 
 ### Live OpenAI Tests
 
-The suite includes an optional integration check that hits the real OpenAI
-Responses API. Set an API key and the `:live` tests will run automatically with
+The suite includes an optional integration check that hits the real OpenAI Responses API
 `mix test`:
 
 ```shell
-export OPENAI_API_KEY=sk-...
-export OPENAI_BASE_URL=.../v1
+export OPENAI_API_KEY="..."             # LiteLLM proxy key
+export OPENAI_BASE_URL="..."            # LiteLLM proxy URL
+export OPENAI_DIRECT_API_KEY="..."      # Direct OpenAI key
+export OPENAI_DIRECT_BASE_URL="https://api.openai.com/v1"
 mix test
 ```
 

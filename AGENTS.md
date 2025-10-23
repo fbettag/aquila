@@ -10,7 +10,7 @@
 - `mix deps.get` – fetch Elixir dependencies.
 - `mix compile` – compile the library and surface any warnings.
 - `mix test` – run the full ExUnit suite (cassette-backed tests included).
-- `OPENAI_API_KEY=... mix test test/responses_retrieval_test.exs` – re-record live Responses fixtures.
+- `OPENAI_API_KEY=... mix test test/integration/responses_retrieval_test.exs` – re-record live Responses fixtures.
 - `mix coveralls` – execute tests with coverage enforcement (fails <82%).
 - `mix deps.unlock --unused` – prune unused deps when altering `mix.exs`.
 
