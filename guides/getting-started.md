@@ -36,7 +36,7 @@ requests, and enabling streaming output.
 
    ```elixir
    # config/test.exs
-   config :aquila, transport: Aquila.Transport.Record
+   config :aquila, :transport, Aquila.Transport.Record
    config :aquila, :recorder,
      path: "test/support/fixtures/aquila_cassettes",
      transport: Aquila.Transport.OpenAI
@@ -54,7 +54,7 @@ with textual output, usage metadata, and the raw payload.
 ```elixir
 response =
   Aquila.ask("Explain OTP supervision trees",
-    instruction: "You are a senior Elixir tutor.",
+    instructions: "You are a senior Elixir tutor.",
     model: "gpt-4o-mini"
   )
 
@@ -72,7 +72,7 @@ messages to update UI state incrementally or log telemetry.
 ```elixir
 {:ok, ref} =
   Aquila.stream("Give me three talking points about BEAM performance",
-    instruction: "Be concise.",
+    instructions: "Be concise.",
     tools: [],
     sink: Aquila.Sink.pid(self())
   )
@@ -84,7 +84,8 @@ end
 ```
 
 Use `Aquila.Sink.fun/1` for a callback-based sink or
-`Aquila.Sink.collector/1` for deterministic test flows.
+`Aquila.Sink.collector/0,1,2` for deterministic test flows (accepts optional
+owner process and options).
 
 If you need to update instructions without losing context, capture the
 `response_id` or `previous_response_id` from the `:done` metadata and supply

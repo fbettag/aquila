@@ -11,8 +11,9 @@ set of tuples delivered to your sink.
 - `Aquila.Sink.pid/2` – sends tuples to a process (`{:aquila_chunk, chunk, ref}`),
   optionally omitting the reference via `with_ref: false`.
 - `Aquila.Sink.fun/1` – passes each event to a two-arity function.
-- `Aquila.Sink.collector/2` – replays events to a supervising process with an
-  internal reference, great for assertions during tests.
+- `Aquila.Sink.collector/0,1,2` – replays events to a supervising process with an
+  internal reference, great for assertions during tests. Accepts optional owner
+  process and options.
 
 All sinks receive the following events:
 
@@ -75,7 +76,7 @@ latency metrics alongside your sink-driven UI updates.
 
 ## Tips
 
-- Combine `Aquila.Sink.collector/1` with the recorder transport to assert exact
+- Combine `Aquila.Sink.collector/0,1,2` with the recorder transport to assert exact
   chunk ordering in tests.
 - Use the `metadata` option when calling `Aquila.stream/2` to tag streams with
   session IDs; the recorder persists these values so you can audit playback

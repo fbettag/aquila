@@ -191,7 +191,7 @@ config :aquila, :openai,
 
 Test config in `config/test.exs`:
 ```elixir
-config :aquila, transport: Aquila.Transport.Record
+config :aquila, :transport, Aquila.Transport.Record
 config :aquila, :recorder,
   path: "test/support/fixtures/aquila_cassettes",
   transport: Aquila.Transport.OpenAI

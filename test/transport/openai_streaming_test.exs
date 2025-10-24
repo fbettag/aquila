@@ -423,6 +423,122 @@ defmodule Aquila.OpenAITransportStreamingTest do
            ] = events
   end
 
+  test "chat stream accumulates tool call fragments across events" do
+    first_chunk = %{
+      "id" => "chat_multi",
+      "model" => "gpt-test",
+      "choices" => [
+        %{
+          "delta" => %{
+            "tool_calls" => [
+              %{
+                "id" => "call_frag",
+                "index" => 0,
+                "function" => %{"name" => "multi", "arguments" => "{\"foo\":\""}
+              }
+            ]
+          },
+          "finish_reason" => nil
+        }
+      ]
+    }
+
+    second_chunk = %{
+      "id" => "chat_multi",
+      "model" => "gpt-test",
+      "choices" => [
+        %{
+          "delta" => %{
+            "tool_calls" => [
+              %{
+                "index" => 0,
+                "function" => %{"arguments" => "bar\"}"}
+              }
+            ]
+          },
+          "finish_reason" => "tool_calls"
+        }
+      ]
+    }
+
+    events =
+      run_stream([sse_event(first_chunk), sse_event(second_chunk)], %{endpoint: :chat})
+
+    assert [
+             %{
+               type: :tool_call,
+               id: "call_frag",
+               name: "multi",
+               args_fragment: "{\"foo\":\"",
+               call_id: "call_frag"
+             },
+             %{
+               type: :tool_call,
+               id: nil,
+               name: nil,
+               args_fragment: "bar\"}",
+               call_id: "call_frag"
+             },
+             %{
+               type: :tool_call_end,
+               id: "call_frag",
+               name: "multi",
+               args: %{"foo" => "bar"},
+               call_id: "call_frag"
+             },
+             %{
+               type: :done,
+               status: :requires_action,
+               meta: %{id: "chat_multi", model: "gpt-test", reason: "tool_calls"}
+             }
+           ] = events
+  end
+
+  test "chat stream falls back to empty args when fragments decode fails" do
+    payload = %{
+      "id" => "chat_bad_json",
+      "model" => "gpt-test",
+      "choices" => [
+        %{
+          "delta" => %{
+            "tool_calls" => [
+              %{
+                "id" => "call_bad",
+                "index" => 0,
+                "function" => %{"name" => "multi", "arguments" => "{invalid"}
+              }
+            ]
+          },
+          "finish_reason" => "tool_calls"
+        }
+      ]
+    }
+
+    events = run_stream([sse_event(payload)], %{endpoint: :chat})
+
+    assert [
+             %{
+               type: :tool_call,
+               id: "call_bad",
+               name: "multi",
+               args_fragment: "{invalid",
+               call_id: "call_bad"
+             },
+             %{
+               type: :tool_call_end,
+               id: "call_bad",
+               name: "multi",
+               args: %{},
+               call_id: "call_bad"
+             },
+             %{
+               type: :done,
+               status: :requires_action,
+               meta: %{id: "chat_bad_json", model: "gpt-test", reason: "tool_calls"}
+             }
+           ] = events
+  end
+
   test "stream emits usage delta events" do
     events = [
       sse_event(%{"type" => "response.usage.delta", "usage" => %{"prompt_tokens" => 2}}),

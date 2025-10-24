@@ -89,7 +89,7 @@ defmodule MyApp.Workers.GenerateSummary do
     response =
       Aquila.ask("Summarise the following", cassette: "jobs/generate_summary", tools: [],
         metadata: %{id: text[:id]},
-        instruction: "Write a concise executive summary."
+        instructions: "Write a concise executive summary."
       )
 
     MyApp.Summaries.store(text[:id], response.text, response.raw)

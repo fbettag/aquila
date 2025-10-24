@@ -186,7 +186,8 @@ signal success, failure, and context updates:
 - `Aquila.Sink.pid/2` – sends tuples such as `{:aquila_chunk, chunk, ref}` to a
   process so you can react inside supervisors, GenServers, or UI code.
 - `Aquila.Sink.fun/1` – wraps a two-arity callback.
-- `Aquila.Sink.collector/1` – mirrors events back to the caller for assertions.
+- `Aquila.Sink.collector/0,1,2` – mirrors events back to the caller for assertions
+  (accepts optional owner process and options).
 
 Telemetry events fire on `[:aquila, :stream, :start | :chunk | :stop]` and
 `[:aquila, :tool, :invoke]` so you can attach metrics or trace instrumentation.

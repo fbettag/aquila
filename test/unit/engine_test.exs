@@ -19,6 +19,7 @@ defmodule Aquila.EngineTest do
   alias Aquila.Engine
   alias Aquila.Message
   alias Aquila.Tool
+  alias Aquila.Sink
 
   @silent_transport __MODULE__.SilentTransport
 
@@ -141,6 +142,64 @@ defmodule Aquila.EngineTest do
     end
   end
 
+  defmodule SimpleStreamTransport do
+    @behaviour Aquila.Transport
+
+    @impl true
+    def post(_req), do: {:ok, %{}}
+
+    @impl true
+    def get(_req), do: {:ok, %{}}
+
+    @impl true
+    def delete(_req), do: {:ok, %{}}
+
+    @impl true
+    def stream(req, callback) do
+      requests = Process.get(:simple_stream_requests, [])
+      Process.put(:simple_stream_requests, [req | requests])
+
+      callback.(%{type: :delta, content: "Hi"})
+      callback.(%{type: :done, status: :completed, meta: %{usage: %{"output_tokens" => 1}}})
+      {:ok, make_ref()}
+    end
+  end
+
+  defmodule FetchFullResponseTransport do
+    @behaviour Aquila.Transport
+
+    @impl true
+    def post(req) do
+      requests = Process.get(:fetch_full_requests, [])
+      Process.put(:fetch_full_requests, [req | requests])
+
+      {:ok,
+       %{
+         "output" => [
+           %{
+             "type" => "message",
+             "content" => [
+               %{"type" => "output_text", "text" => "post-response"}
+             ]
+           }
+         ],
+         "usage" => %{"output_tokens" => 4}
+       }}
+    end
+
+    @impl true
+    def get(_req), do: {:ok, %{}}
+
+    @impl true
+    def delete(_req), do: {:ok, %{}}
+
+    @impl true
+    def stream(_req, callback) do
+      callback.(%{type: :done, status: :completed, meta: %{}})
+      {:ok, make_ref()}
+    end
+  end
+
   describe "metadata handling" do
     setup do
       cleanup = fn ->
@@ -216,6 +275,136 @@ defmodule Aquila.EngineTest do
 
       assert store == true
       assert metadata == %{foo: "bar"}
+    end
+  end
+
+  describe "streaming pipeline" do
+    setup do
+      Process.delete(:simple_stream_requests)
+      :ok
+    end
+
+    test "run aggregates response text for non-streaming call" do
+      sink = Sink.collector(self())
+
+      response =
+        Engine.run("ignored",
+          transport: SimpleStreamTransport,
+          endpoint: :responses,
+          model: "gpt-test",
+          sink: sink
+        )
+
+      assert response.text == "Hi"
+      assert response.meta[:status] == :completed
+    end
+
+    test "stream mode emits chunk and done events" do
+      sink = Sink.collector(self())
+
+      {:ok, ref} =
+        Engine.run("ignored",
+          stream: true,
+          transport: SimpleStreamTransport,
+          endpoint: :responses,
+          model: "gpt-test",
+          sink: sink
+        )
+
+      assert_receive {:aquila_chunk, "Hi", ^ref}
+      assert_receive {:aquila_done, "Hi", meta, ^ref}
+      assert meta[:status] == :completed
+    end
+  end
+
+  describe "response fallback fetch" do
+    setup do
+      Process.delete(:fetch_full_requests)
+      :ok
+    end
+
+    test "run fetches full response when streaming text empty" do
+      response =
+        Engine.run("ignored",
+          transport: FetchFullResponseTransport,
+          endpoint: :responses,
+          model: "gpt-test",
+          sink: :ignore
+        )
+
+      assert response.text == "post-response"
+      assert response.meta[:usage] == %{"output_tokens" => 4}
+
+      fetched = Process.get(:fetch_full_requests, []) |> List.first()
+
+      assert fetched.body[:stream] == false
+    end
+  end
+
+  describe "engine retry paths" do
+    setup do
+      cleanup = fn ->
+        Process.delete(:force_tool_round)
+        Process.delete(:force_tool_requests)
+        Process.delete(:fallback_tool_executed)
+      end
+
+      cleanup.()
+      on_exit(cleanup)
+      :ok
+    end
+
+    test "forces tool choice and executes fallback tool" do
+      tool =
+        Tool.new("recall", fn _args ->
+          Process.put(:fallback_tool_executed, true)
+          {:ok, "fallback"}
+        end)
+
+      _response =
+        Engine.run("no tool call",
+          transport: __MODULE__.ForceToolTransport,
+          tools: [tool],
+          endpoint: :responses,
+          model: "gpt-test",
+          sink: :ignore
+        )
+
+      requests = Process.get(:force_tool_requests, []) |> Enum.reverse()
+      assert length(requests) == 2
+
+      first = Enum.at(requests, 0)
+      refute Map.get(first, :tool_choice) || Map.get(first, "tool_choice")
+
+      assert Process.get(:force_tool_round) == 2
+      assert Process.get(:fallback_tool_executed)
+    end
+
+    test "raises transport error and notifies sink" do
+      sink = Sink.collector(self())
+
+      assert_raise RuntimeError, fn ->
+        Engine.run("error",
+          transport: __MODULE__.ErrorTransport,
+          endpoint: :responses,
+          model: "gpt-test",
+          sink: sink
+        )
+      end
+
+      assert_receive {:aquila_error, :boom, _ref}
+    end
+
+    test "skips duplicate final delta chunks" do
+      response =
+        Engine.run("hello",
+          transport: __MODULE__.DuplicateDeltaTransport,
+          endpoint: :responses,
+          model: "gpt-test",
+          sink: :ignore
+        )
+
+      assert response.text == "Hi"
     end
   end
 
@@ -378,6 +567,68 @@ defmodule Aquila.EngineTest do
           callback.(%{type: :done, status: :completed})
           {:ok, make_ref()}
       end
+    end
+  end
+
+  defmodule ForceToolTransport do
+    @behaviour Aquila.Transport
+
+    @impl true
+    def post(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def get(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def delete(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def stream(req, callback) do
+      round = Process.get(:force_tool_round, 0)
+      Process.put(:force_tool_round, round + 1)
+
+      requests = Process.get(:force_tool_requests, [])
+      Process.put(:force_tool_requests, [req.body | requests])
+
+      callback.(%{type: :done, status: :completed, meta: %{}})
+      {:ok, make_ref()}
+    end
+  end
+
+  defmodule ErrorTransport do
+    @behaviour Aquila.Transport
+
+    @impl true
+    def post(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def get(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def delete(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def stream(_req, _callback), do: {:error, :boom}
+  end
+
+  defmodule DuplicateDeltaTransport do
+    @behaviour Aquila.Transport
+
+    @impl true
+    def post(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def get(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def delete(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def stream(_req, callback) do
+      callback.(%{type: :delta, content: "Hi"})
+      callback.(%{type: :delta, content: "Hi"})
+      callback.(%{type: :done, status: :completed, meta: %{}})
+      {:ok, make_ref()}
     end
   end
 
