@@ -272,59 +272,81 @@ defmodule Aquila.Engine.Responses do
   # Supported types: input_text, input_image, output_text, refusal, input_file, computer_screenshot, summary_text
 
   defp normalize_content_part(%{"type" => "file", "file" => file_obj} = part, _role) do
-    # Responses API expects: type: "input_file", file_data: base64_string, filename: "file.pdf"
-    # Extract base64 from data URL format: "data:media/type;base64,ACTUALBASE64"
-    data_url = Map.get(file_obj, "file_data", "")
+    # Responses API supports both URLs and base64 data:
+    # - For URLs: {"type": "input_file", "file_url": "https://..."}
+    # - For base64: {"type": "input_file", "file_data": "base64...", "filename": "doc.pdf"}
 
-    file_data =
-      case String.split(data_url, ",", parts: 2) do
-        [_prefix, base64_data] -> base64_data
-        _ -> data_url
-      end
+    file_data_or_url = Map.get(file_obj, "file_data", "") || Map.get(file_obj, "file_id", "")
 
-    format = Map.get(file_obj, "format", "application/octet-stream")
-    # Generate filename from format
-    filename =
-      case format do
-        "application/pdf" -> "document.pdf"
-        "text/plain" -> "document.txt"
-        "application/msword" -> "document.doc"
-        _ -> "document.bin"
-      end
+    cond do
+      # Handle URLs (starts with http/https)
+      String.starts_with?(file_data_or_url, ["http://", "https://"]) ->
+        part
+        |> Map.put("type", "input_file")
+        |> Map.put("file_url", file_data_or_url)
+        |> Map.delete("file")
 
-    part
-    |> Map.put("type", "input_file")
-    |> Map.put("file_data", file_data)
-    |> Map.put("filename", filename)
-    |> Map.delete("file")
+      # Handle base64 data URLs
+      String.contains?(file_data_or_url, ";base64,") ->
+        # Keep the full data URL format - the API expects: "data:media/type;base64,ACTUALBASE64"
+        # Use actual filename if provided, otherwise generate a reasonable default
+        filename = Map.get(file_obj, "filename") || infer_filename(file_obj)
+
+        part
+        |> Map.put("type", "input_file")
+        |> Map.put("file_data", file_data_or_url)
+        |> Map.put("filename", filename)
+        |> Map.delete("file")
+
+      # Fallback: treat as base64 data
+      true ->
+        filename = Map.get(file_obj, "filename") || infer_filename(file_obj)
+
+        part
+        |> Map.put("type", "input_file")
+        |> Map.put("file_data", file_data_or_url)
+        |> Map.put("filename", filename)
+        |> Map.delete("file")
+    end
   end
 
   defp normalize_content_part(%{type: "file", file: file_obj} = part, _role) do
-    # Responses API expects: type: "input_file", file_data: base64_string, filename: "file.pdf"
-    # Extract base64 from data URL format: "data:media/type;base64,ACTUALBASE64"
-    data_url = Map.get(file_obj, :file_data, "")
+    # Responses API supports both URLs and base64 data:
+    # - For URLs: {type: "input_file", file_url: "https://..."}
+    # - For base64: {type: "input_file", file_data: "base64...", filename: "doc.pdf"}
 
-    file_data =
-      case String.split(data_url, ",", parts: 2) do
-        [_prefix, base64_data] -> base64_data
-        _ -> data_url
-      end
+    file_data_or_url = Map.get(file_obj, :file_data, "") || Map.get(file_obj, :file_id, "")
 
-    format = Map.get(file_obj, :format, "application/octet-stream")
-    # Generate filename from format
-    filename =
-      case format do
-        "application/pdf" -> "document.pdf"
-        "text/plain" -> "document.txt"
-        "application/msword" -> "document.doc"
-        _ -> "document.bin"
-      end
+    cond do
+      # Handle URLs (starts with http/https)
+      String.starts_with?(file_data_or_url, ["http://", "https://"]) ->
+        part
+        |> Map.put(:type, "input_file")
+        |> Map.put(:file_url, file_data_or_url)
+        |> Map.delete(:file)
 
-    part
-    |> Map.put(:type, "input_file")
-    |> Map.put(:file_data, file_data)
-    |> Map.put(:filename, filename)
-    |> Map.delete(:file)
+      # Handle base64 data URLs
+      String.contains?(file_data_or_url, ";base64,") ->
+        # Keep the full data URL format - the API expects: "data:media/type;base64,ACTUALBASE64"
+        # Use actual filename if provided, otherwise generate a reasonable default
+        filename = Map.get(file_obj, :filename) || infer_filename(file_obj)
+
+        part
+        |> Map.put(:type, "input_file")
+        |> Map.put(:file_data, file_data_or_url)
+        |> Map.put(:filename, filename)
+        |> Map.delete(:file)
+
+      # Fallback: treat as base64 data
+      true ->
+        filename = Map.get(file_obj, :filename) || infer_filename(file_obj)
+
+        part
+        |> Map.put(:type, "input_file")
+        |> Map.put(:file_data, file_data_or_url)
+        |> Map.put(:filename, filename)
+        |> Map.delete(:file)
+    end
   end
 
   defp normalize_content_part(%{"type" => "image"} = part, _role) do
@@ -335,15 +357,35 @@ defmodule Aquila.Engine.Responses do
     Map.put(part, :type, "input_image")
   end
 
-  defp normalize_content_part(%{"type" => "image_url"} = part, _role) do
+  defp normalize_content_part(%{"type" => "image_url", "image_url" => image_url} = part, _role)
+       when is_map(image_url) do
+    # Keep the image_url structure as-is (supports both URLs and data URLs)
     Map.put(part, "type", "input_image")
   end
 
-  defp normalize_content_part(%{type: "image_url"} = part, _role) do
+  defp normalize_content_part(%{type: "image_url", image_url: image_url} = part, _role)
+       when is_map(image_url) do
+    # Keep the image_url structure as-is (supports both URLs and data URLs)
     Map.put(part, :type, "input_image")
   end
 
   defp normalize_content_part(part, _role), do: part
+
+  # Infer a reasonable filename from the file object's format/media type
+  defp infer_filename(file_obj) when is_map(file_obj) do
+    format =
+      Map.get(file_obj, "format") || Map.get(file_obj, :format) || "application/octet-stream"
+
+    case format do
+      "application/pdf" -> "document.pdf"
+      "text/plain" -> "document.txt"
+      "application/msword" -> "document.doc"
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> "document.docx"
+      "text/csv" -> "document.csv"
+      "application/json" -> "document.json"
+      _ -> "document.bin"
+    end
+  end
 
   defp content_type_for_role(:assistant), do: "output_text"
   defp content_type_for_role(:function), do: "output_text"

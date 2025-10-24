@@ -95,6 +95,23 @@ defmodule Aquila.ContentPartTest do
 
       assert result.file.file_data == "data:application/pdf;base64,#{base64}"
       assert result.file.format == "application/pdf"
+      assert result.file.filename == "document.pdf"
+    end
+
+    test "omits filename when not provided" do
+      base64 = "JVBERi0xLjQK"
+      result = ContentPart.file(base64)
+
+      refute Map.has_key?(result.file, :filename)
+    end
+
+    test "accepts filename with various media types" do
+      base64 = "SGVsbG8gd29ybGQ="
+      result = ContentPart.file(base64, filename: "data.txt", media: "text/plain")
+
+      assert result.file.filename == "data.txt"
+      assert result.file.format == "text/plain"
+      assert result.file.file_data == "data:text/plain;base64,#{base64}"
     end
   end
 

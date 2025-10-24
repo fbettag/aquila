@@ -88,16 +88,22 @@ defmodule Aquila.ContentPart do
   @spec file(String.t(), keyword()) :: map()
   def file(base64_data, opts \\ []) when is_binary(base64_data) do
     media_type = Keyword.get(opts, :media, "application/pdf")
+    filename = Keyword.get(opts, :filename)
 
     # Format as data URL with base64
     file_data = "data:#{media_type};base64,#{base64_data}"
 
+    file_obj = %{
+      file_data: file_data,
+      format: media_type
+    }
+
+    # Add filename if provided
+    file_obj = if filename, do: Map.put(file_obj, :filename, filename), else: file_obj
+
     %{
       type: "file",
-      file: %{
-        file_data: file_data,
-        format: media_type
-      }
+      file: file_obj
     }
   end
 

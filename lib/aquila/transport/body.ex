@@ -51,8 +51,9 @@ defmodule Aquila.Transport.Body do
 
   # Normalize values with special handling for certain keys
   defp normalize_value("input", value) when is_list(value) do
-    # Filter out function_call_output items from input array
-    # These are tool outputs from previous conversation turns, not part of the prompt
+    # Filter out function_call_output items from cassette comparison
+    # These are tool outputs from previous conversation turns - ephemeral state
+    # that shouldn't be part of the prompt hash for cassette matching
     value
     |> Enum.reject(&function_call_output?/1)
     |> Enum.map(&normalize/1)
