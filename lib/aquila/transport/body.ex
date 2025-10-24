@@ -43,15 +43,34 @@ defmodule Aquila.Transport.Body do
 
   defp normalize_map(map) do
     map
-    |> Enum.map(fn {key, value} -> {normalize_key(key), normalize(value)} end)
-    |> Enum.reject(&drop_empty_metadata?/1)
+    |> Enum.map(fn {key, value} -> {normalize_key(key), normalize_value(key, value)} end)
+    |> Enum.reject(&drop_field?/1)
     |> Enum.sort_by(&elem(&1, 0))
     |> Map.new()
   end
 
-  defp drop_empty_metadata?({"metadata", value}) when value in [%{}, nil], do: true
-  defp drop_empty_metadata?({:metadata, value}) when value in [%{}, nil], do: true
-  defp drop_empty_metadata?(_), do: false
+  # Normalize values with special handling for certain keys
+  defp normalize_value("input", value) when is_list(value) do
+    # Filter out function_call_output items from input array
+    # These are tool outputs from previous conversation turns, not part of the prompt
+    value
+    |> Enum.reject(&function_call_output?/1)
+    |> Enum.map(&normalize/1)
+  end
+
+  defp normalize_value(_key, value), do: normalize(value)
+
+  # Check if an item is a function_call_output
+  defp function_call_output?(%{"type" => "function_call_output"}), do: true
+  defp function_call_output?(%{type: "function_call_output"}), do: true
+  defp function_call_output?(_), do: false
+
+  # Drop fields that are ephemeral (conversation state) rather than prompt content
+  defp drop_field?({"metadata", value}) when value in [%{}, nil], do: true
+  defp drop_field?({:metadata, value}) when value in [%{}, nil], do: true
+  defp drop_field?({"previous_response_id", _}), do: true
+  defp drop_field?({:previous_response_id, _}), do: true
+  defp drop_field?(_), do: false
 
   defp normalize_key(key) when is_atom(key), do: Atom.to_string(key)
   defp normalize_key(key), do: key

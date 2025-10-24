@@ -1,8 +1,6 @@
 defmodule Aquila.Transport.Cassette do
   @moduledoc false
 
-  alias StableJason
-
   @type cassette :: String.t()
   @type index :: pos_integer()
 
@@ -58,7 +56,7 @@ defmodule Aquila.Transport.Cassette do
 
       result =
         path
-        |> File.stream!([], :line)
+        |> File.stream!(:line, [])
         |> Enum.reduce_while(:ok, fn line, acc ->
           trimmed = String.trim(line)
 
@@ -157,26 +155,24 @@ defmodule Aquila.Transport.Cassette do
     if File.exists?(path) do
       result =
         path
-        |> File.stream!([], :line)
+        |> File.stream!(:line, [])
         |> Enum.reduce_while(%{}, fn line, acc ->
           trimmed = String.trim(line)
 
-          cond do
-            trimmed == "" ->
-              {:cont, acc}
+          if trimmed == "" do
+            {:cont, acc}
+          else
+            case Jason.decode(trimmed) do
+              {:ok, %{"request_id" => request_id} = event} ->
+                events = Map.get(acc, request_id, [])
+                {:cont, Map.put(acc, request_id, [event | events])}
 
-            true ->
-              case Jason.decode(trimmed) do
-                {:ok, %{"request_id" => request_id} = event} ->
-                  events = Map.get(acc, request_id, [])
-                  {:cont, Map.put(acc, request_id, [event | events])}
+              {:error, reason} ->
+                {:halt, {:error, {:sse_decode_failed, path, reason}}}
 
-                {:error, reason} ->
-                  {:halt, {:error, {:sse_decode_failed, path, reason}}}
-
-                _ ->
-                  {:cont, acc}
-              end
+              _ ->
+                {:cont, acc}
+            end
           end
         end)
 
@@ -209,6 +205,8 @@ defmodule Aquila.Transport.Cassette do
   @doc false
   @spec cache_sse_request(cassette(), index()) :: :ok
   def cache_sse_request(cassette, request_id) do
+    prune_sse_request(cassette, request_id)
+
     table = ensure_sse_table()
     :ets.insert(table, {{cassette, request_id}, %{raw: [], dedup: [], last_status: nil}})
     :ets.insert(table, {{:loaded, cassette}, {:cache, :dirty}})
@@ -354,9 +352,7 @@ defmodule Aquila.Transport.Cassette do
   end
 
   defp stringify_top_level_keys(map) when is_map(map) do
-    map
-    |> Enum.map(fn {key, value} -> {canonical_key(key), value} end)
-    |> Enum.into(%{})
+    Map.new(map, fn {key, value} -> {canonical_key(key), value} end)
   end
 
   defp normalize_done_status(%{"type" => "done"} = event) do
@@ -410,7 +406,8 @@ defmodule Aquila.Transport.Cassette do
 
   @spec base_path() :: String.t()
   def base_path do
-    Application.get_env(:aquila, :recorder, [])
+    :aquila
+    |> Application.get_env(:recorder, [])
     |> Keyword.get(:path, "test/support/fixtures/aquila_cassettes")
   end
 
@@ -533,10 +530,26 @@ defmodule Aquila.Transport.Cassette do
     path = meta_path(cassette)
     ensure_dir(path)
 
-    meta_with_id = Map.put(meta, "request_id", request_id)
-    line = StableJason.encode!(meta_with_id, sorter: :asc) <> "\n"
+    meta_with_id =
+      meta
+      |> Map.put("request_id", request_id)
+      |> stringify_top_level_keys()
 
-    File.write!(path, line, [:append])
+    existing =
+      if File.exists?(path) do
+        load_meta_entries(path)
+      else
+        %{}
+      end
+
+    updated = Map.put(existing, request_id, meta_with_id)
+
+    lines =
+      updated
+      |> Enum.sort_by(fn {req_id, _} -> req_id end)
+      |> Enum.map(fn {_, entry} -> StableJason.encode!(entry, sorter: :asc) <> "\n" end)
+
+    File.write!(path, lines)
     cache_meta_entry(cassette, request_id, meta_with_id)
   end
 
@@ -563,6 +576,64 @@ defmodule Aquila.Transport.Cassette do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  defp load_meta_entries(path) do
+    path
+    |> File.stream!(:line, [])
+    |> Enum.reduce(%{}, fn line, acc ->
+      trimmed = String.trim(line)
+
+      if trimmed == "" do
+        acc
+      else
+        case Jason.decode(trimmed) do
+          {:ok, %{"request_id" => req_id} = entry} when is_integer(req_id) ->
+            Map.put(acc, req_id, stringify_top_level_keys(entry))
+
+          {:ok, %{"request_id" => req_id} = entry} ->
+            Map.put(acc, req_id, stringify_top_level_keys(entry))
+
+          _ ->
+            acc
+        end
+      end
+    end)
+  end
+
+  defp prune_sse_request(cassette, request_id) do
+    path = sse_path(cassette)
+
+    if File.exists?(path) do
+      {lines, removed?} =
+        path
+        |> File.stream!(:line, [])
+        |> Enum.reduce({[], false}, fn line, {acc, removed} ->
+          trimmed = String.trim(line)
+
+          if trimmed == "" do
+            {[line | acc], removed}
+          else
+            case Jason.decode(trimmed) do
+              {:ok, %{"request_id" => ^request_id}} ->
+                {acc, true}
+
+              {:ok, _other} ->
+                {[line | acc], removed}
+
+              {:error, _reason} ->
+                {[line | acc], removed}
+            end
+          end
+        end)
+
+      if removed? do
+        File.write!(path, Enum.reverse(lines))
+      end
+    end
+
+    table = ensure_sse_table()
+    :ets.delete(table, {cassette, request_id})
   end
 
   @spec ensure_dir(String.t()) :: :ok

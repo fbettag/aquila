@@ -155,18 +155,58 @@ defmodule Aquila.Engine.Responses do
         description = Map.get(function, :description) || Map.get(function, "description")
         parameters = Map.get(function, :parameters) || Map.get(function, "parameters")
 
+        # Determine if tool has optional parameters
+        # If it does, we need to explicitly set strict: false to prevent the API from
+        # automatically making all parameters required
+        strict = should_use_strict_mode?(parameters)
+
         tool
         |> Map.delete(:function)
         |> Map.delete("function")
         |> Shared.maybe_put(:name, name)
         |> Shared.maybe_put(:description, description)
         |> Shared.maybe_put(:parameters, parameters)
+        |> Shared.maybe_put(:strict, strict)
       else
         # Non-function tools (e.g., code_interpreter, file_search) pass through unchanged
         tool
       end
     end)
   end
+
+  # Determines if a tool should use strict mode based on its parameters.
+  # If a tool has optional parameters (properties not in the required array),
+  # we must explicitly set strict: false. Otherwise, the Responses API will
+  # automatically enable strict mode and make ALL properties required.
+  defp should_use_strict_mode?(nil), do: nil
+
+  defp should_use_strict_mode?(%{} = params) do
+    properties = Map.get(params, "properties") || Map.get(params, :properties) || %{}
+    required = Map.get(params, "required") || Map.get(params, :required) || []
+
+    property_names =
+      properties
+      |> Map.keys()
+      |> Enum.map(&to_string/1)
+      |> MapSet.new()
+
+    required_names =
+      required
+      |> Enum.map(&to_string/1)
+      |> MapSet.new()
+
+    # If there are properties that are NOT in the required array, we have optional params
+    has_optional_params = not MapSet.subset?(property_names, required_names)
+
+    # Return false for strict mode if there are optional params, otherwise nil (let API decide)
+    if has_optional_params do
+      false
+    else
+      nil
+    end
+  end
+
+  defp should_use_strict_mode?(_), do: nil
 
   # Converts tool payload to function_call_output format for Responses API
   defp tool_payload_to_function_call_output(%{call_id: call_id, output: output}) do
@@ -183,7 +223,7 @@ defmodule Aquila.Engine.Responses do
     if content_parts?(content) do
       %{
         role: Atom.to_string(role),
-        content: content
+        content: normalize_content_parts(content, role)
       }
     else
       # iodata - convert to single text part
@@ -207,7 +247,7 @@ defmodule Aquila.Engine.Responses do
   defp message_to_response(%Message{role: role, content: content}) when is_map(content) do
     %{
       role: Atom.to_string(role),
-      content: [content]
+      content: [normalize_content_part(content, role)]
     }
   end
 
@@ -215,6 +255,99 @@ defmodule Aquila.Engine.Responses do
   defp content_parts?([]), do: false
   defp content_parts?([%{} | _]), do: true
   defp content_parts?(_), do: false
+
+  defp normalize_content_parts(parts, role) do
+    Enum.map(parts, &normalize_content_part(&1, role))
+  end
+
+  defp normalize_content_part(%{"type" => "text"} = part, role) do
+    Map.put(part, "type", content_type_for_role(role))
+  end
+
+  defp normalize_content_part(%{type: "text"} = part, role) do
+    Map.put(part, :type, content_type_for_role(role))
+  end
+
+  # Normalize common content types to Responses API format
+  # Supported types: input_text, input_image, output_text, refusal, input_file, computer_screenshot, summary_text
+
+  defp normalize_content_part(%{"type" => "file", "file" => file_obj} = part, _role) do
+    # Responses API expects: type: "input_file", file_data: base64_string, filename: "file.pdf"
+    # Extract base64 from data URL format: "data:media/type;base64,ACTUALBASE64"
+    data_url = Map.get(file_obj, "file_data", "")
+
+    file_data =
+      case String.split(data_url, ",", parts: 2) do
+        [_prefix, base64_data] -> base64_data
+        _ -> data_url
+      end
+
+    format = Map.get(file_obj, "format", "application/octet-stream")
+    # Generate filename from format
+    filename =
+      case format do
+        "application/pdf" -> "document.pdf"
+        "text/plain" -> "document.txt"
+        "application/msword" -> "document.doc"
+        _ -> "document.bin"
+      end
+
+    part
+    |> Map.put("type", "input_file")
+    |> Map.put("file_data", file_data)
+    |> Map.put("filename", filename)
+    |> Map.delete("file")
+  end
+
+  defp normalize_content_part(%{type: "file", file: file_obj} = part, _role) do
+    # Responses API expects: type: "input_file", file_data: base64_string, filename: "file.pdf"
+    # Extract base64 from data URL format: "data:media/type;base64,ACTUALBASE64"
+    data_url = Map.get(file_obj, :file_data, "")
+
+    file_data =
+      case String.split(data_url, ",", parts: 2) do
+        [_prefix, base64_data] -> base64_data
+        _ -> data_url
+      end
+
+    format = Map.get(file_obj, :format, "application/octet-stream")
+    # Generate filename from format
+    filename =
+      case format do
+        "application/pdf" -> "document.pdf"
+        "text/plain" -> "document.txt"
+        "application/msword" -> "document.doc"
+        _ -> "document.bin"
+      end
+
+    part
+    |> Map.put(:type, "input_file")
+    |> Map.put(:file_data, file_data)
+    |> Map.put(:filename, filename)
+    |> Map.delete(:file)
+  end
+
+  defp normalize_content_part(%{"type" => "image"} = part, _role) do
+    Map.put(part, "type", "input_image")
+  end
+
+  defp normalize_content_part(%{type: "image"} = part, _role) do
+    Map.put(part, :type, "input_image")
+  end
+
+  defp normalize_content_part(%{"type" => "image_url"} = part, _role) do
+    Map.put(part, "type", "input_image")
+  end
+
+  defp normalize_content_part(%{type: "image_url"} = part, _role) do
+    Map.put(part, :type, "input_image")
+  end
+
+  defp normalize_content_part(part, _role), do: part
+
+  defp content_type_for_role(:assistant), do: "output_text"
+  defp content_type_for_role(:function), do: "output_text"
+  defp content_type_for_role(_role), do: "input_text"
 
   defp response_text_part(role, content) do
     type =
