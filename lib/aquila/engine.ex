@@ -212,23 +212,19 @@ defmodule Aquila.Engine do
             end
         end
 
-      state.status in [:completed, :succeeded, :done] and
-        state.tools != [] and
-        state.tool_call_history == [] and
-        state.tool_choice == :auto and
-          not state.tool_choice_forced? ->
-        Logger.info("No tool calls observed; retrying with forced tool choice")
-        loop(force_tool_choice(state))
-
-      state.status in [:completed, :succeeded, :done] and
-        state.tool_choice_forced? and
-        state.tool_call_history == [] and
-          state.tools != [] ->
-        Logger.warning("Forced tool choice ignored; executing fallback tool invocation")
-        execute_fallback_tool_calls(state)
-
       state.status in [:completed, :succeeded, :done] ->
-        state
+        cond do
+          should_force_tool_choice?(state) ->
+            Logger.info("No tool calls observed; retrying with forced tool choice")
+            loop(force_tool_choice(state))
+
+          state.tool_choice_forced? and state.tool_call_history == [] and state.tools != [] ->
+            Logger.warning("Forced tool choice ignored; executing fallback tool invocation")
+            execute_fallback_tool_calls(state)
+
+          true ->
+            state
+        end
 
       state.status == :requires_action ->
         # Tools requested but not ready yet - this shouldn't happen since
@@ -892,6 +888,38 @@ defmodule Aquila.Engine do
       _ -> :auto
     end
   end
+
+  defp should_force_tool_choice?(%State{} = state) do
+    state.tools != [] and
+      state.tool_call_history == [] and
+      state.tool_choice == :auto and
+      not state.tool_choice_forced? and
+      not assistant_has_content?(state.messages)
+  end
+
+  defp assistant_has_content?(messages) do
+    messages
+    |> Enum.reverse()
+    |> Enum.find(&(&1.role == :assistant))
+    |> case do
+      nil -> false
+      %{content: content} -> content_present?(content)
+      _ -> false
+    end
+  end
+
+  defp content_present?(nil), do: false
+  defp content_present?(content) when is_binary(content), do: String.trim(content) != ""
+
+  defp content_present?(content) when is_list(content) do
+    Enum.any?(content, &content_present?/1)
+  end
+
+  defp content_present?(%{text: text}), do: content_present?(text)
+  defp content_present?(%{"text" => text}), do: content_present?(text)
+  defp content_present?(%{content: inner}), do: content_present?(inner)
+  defp content_present?(%{"content" => inner}), do: content_present?(inner)
+  defp content_present?(other), do: other not in [nil, "", []]
 
   defp force_tool_choice(%State{} = state) do
     choice = compute_forced_tool_choice(state.tools)

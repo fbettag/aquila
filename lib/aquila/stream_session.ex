@@ -48,6 +48,7 @@ defmodule Aquila.StreamSession do
   """
 
   require Logger
+  alias Aquila.Cassette
 
   # Ensure Phoenix.PubSub is compiled (optional dependency)
   _ = Code.ensure_loaded(Phoenix.PubSub)
@@ -297,6 +298,9 @@ defmodule Aquila.StreamSession do
           session_id
         })
 
+        # Prevent cassette leakage into subsequent tasks (tests share supervisors/group leaders).
+        Cassette.clear()
+
         :ok
 
       {:aquila_error, reason, ^ref} ->
@@ -311,6 +315,8 @@ defmodule Aquila.StreamSession do
           reason
         })
 
+        Cassette.clear()
+
         {:error, reason}
     after
       timeout ->
@@ -324,6 +330,8 @@ defmodule Aquila.StreamSession do
           session_id,
           reason
         })
+
+        Cassette.clear()
 
         {:error, reason}
     end
