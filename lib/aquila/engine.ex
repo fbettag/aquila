@@ -58,6 +58,7 @@ defmodule Aquila.Engine do
       final_meta: %{},
       usage: %{},
       round: 0,
+      consecutive_tool_failures: 0,
       telemetry: %{start_time: nil, meta: %{}},
       error: nil,
       supports_tool_role: nil,
@@ -190,9 +191,10 @@ defmodule Aquila.Engine do
 
     cond do
       ready_tool_calls?(state) ->
-        state
-        |> execute_tools()
-        |> loop()
+        case execute_tools(state) do
+          {:halt, halted_state} -> halted_state
+          %State{} = new_state -> loop(new_state)
+        end
 
       match?(%{error: error} when not is_nil(error), state) ->
         case detect_tool_message_format_error(state.error, state) do
@@ -410,62 +412,85 @@ defmodule Aquila.Engine do
   defp execute_tools(%State{} = state) do
     {ready, pending} = Enum.split_with(state.pending_calls, &(&1.status == :ready))
 
-    # Detect infinite tool call loops before executing
-    case detect_tool_loop(state, ready) do
-      {:loop_detected, call_signature} ->
-        handle_tool_loop_detected(state, ready, pending, call_signature)
+    # Hard cap to prevent infinite loops
+    max_calls = Application.get_env(:aquila, :max_tool_iterations, 24)
 
-      :no_loop ->
-        # No loop detected, proceed normally
-        endpoint_impl = get_endpoint_impl(state)
+    if length(state.tool_call_history) >= max_calls do
+      {:halt, halt_due_to_iteration_limit(state, ready)}
+    else
+      execute_tools_with_failure_tracking(state, ready, pending)
+    end
+  end
 
-        {payloads, {messages, tool_context, tool_outputs, call_history}} =
-          Enum.map_reduce(
-            ready,
-            {state.messages, state.tool_context, [], state.tool_call_history},
-            fn call, {msgs, ctx, outputs, history} ->
-              state_for_call = %{state | tool_context: ctx}
+  defp execute_tools_with_failure_tracking(state, ready, pending) do
+    max_failures = Application.get_env(:aquila, :max_consecutive_tool_failures, 3)
+    endpoint_impl = get_endpoint_impl(state)
 
-              msgs_with_call =
-                endpoint_impl.maybe_append_assistant_tool_call(state_for_call, msgs, call)
+    # Execute tools and collect statuses
+    {payloads, {statuses, {messages, tool_context, tool_outputs, call_history}}} =
+      Enum.map_reduce(
+        ready,
+        {[], {state.messages, state.tool_context, [], state.tool_call_history}},
+        fn call, {status_acc, {msgs, ctx, outputs, history}} ->
+          state_for_call = %{state | tool_context: ctx}
 
-              {payload, new_msgs, new_ctx} =
-                Shared.invoke_tool(state_for_call, call, msgs_with_call, endpoint_impl)
+          msgs_with_call =
+            endpoint_impl.maybe_append_assistant_tool_call(state_for_call, msgs, call)
 
-              # Store tool output info for potential retry (include args for role switching)
-              output_info = %{
-                call_id: call.id,
-                name: call.name,
-                args: call.args,
-                output: payload.output
-              }
+          # invoke_tool now returns 4-tuple with status
+          {payload, new_msgs, new_ctx, status} =
+            Shared.invoke_tool(state_for_call, call, msgs_with_call, endpoint_impl)
 
-              # Track this call in history
-              call_signature = {call.name, call.args}
-              {payload, {new_msgs, new_ctx, [output_info | outputs], [call_signature | history]}}
-            end
-          )
+          output_info = %{
+            call_id: call.id,
+            name: call.name,
+            args: call.args,
+            output: payload.output
+          }
 
-        payloads = Enum.reverse(payloads)
-        tool_outputs = Enum.reverse(tool_outputs)
+          call_signature = {call.name, call.args}
 
-        # Use endpoint-specific handler for tool outputs
-        updated_state =
-          endpoint_impl.handle_tool_outputs(
-            state,
-            payloads,
-            messages,
-            tool_context,
-            tool_outputs,
-            call_history
-          )
+          {payload,
+           {[status | status_acc],
+            {new_msgs, new_ctx, [output_info | outputs], [call_signature | history]}}}
+        end
+      )
 
-        %{
-          updated_state
-          | pending_calls: pending,
-            status: :in_progress,
-            final_meta: Shared.append_tool_meta(state.final_meta, ready)
-        }
+    payloads = Enum.reverse(payloads)
+    statuses = Enum.reverse(statuses)
+    tool_outputs = Enum.reverse(tool_outputs)
+
+    # Update failure count based on results
+    new_failure_count =
+      cond do
+        Enum.any?(statuses, &(&1 == :ok)) -> 0
+        Enum.all?(statuses, &(&1 == :error)) -> state.consecutive_tool_failures + 1
+        true -> state.consecutive_tool_failures
+      end
+
+    # Use endpoint-specific handler for tool outputs
+    updated_state =
+      endpoint_impl.handle_tool_outputs(
+        state,
+        payloads,
+        messages,
+        tool_context,
+        tool_outputs,
+        call_history
+      )
+
+    updated_state = %{
+      updated_state
+      | pending_calls: pending,
+        status: :in_progress,
+        final_meta: Shared.append_tool_meta(state.final_meta, ready),
+        consecutive_tool_failures: new_failure_count
+    }
+
+    if new_failure_count >= max_failures do
+      {:halt, halt_due_to_consecutive_failures(updated_state, ready)}
+    else
+      updated_state
     end
   end
 
@@ -762,117 +787,59 @@ defmodule Aquila.Engine do
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
-  defp handle_tool_loop_detected(%State{} = state, ready_calls, pending_calls, call_signature) do
-    {tool_name, tool_args} = call_signature
+  defp halt_due_to_iteration_limit(%State{} = state, ready_calls) do
+    max_calls = Application.get_env(:aquila, :max_tool_iterations, 24)
 
-    Logger.warning(
-      "Tool call loop detected; returning error payload instead of executing tool",
-      tool: tool_name,
-      args: tool_args
-    )
+    tool_name =
+      case List.first(ready_calls) do
+        nil -> "unknown"
+        call -> call.name
+      end
 
-    endpoint_impl = get_endpoint_impl(state)
+    halt_message =
+      "Stopping after hitting the tool iteration limit (#{max_calls}). " <>
+        "The tool '#{tool_name}' was invoked too many times. " <>
+        "Please adjust the request or tool parameters."
 
-    {payloads, {messages, tool_context, tool_outputs, call_history}} =
-      Enum.map_reduce(
-        ready_calls,
-        {state.messages, state.tool_context, [], state.tool_call_history},
-        fn call, {msgs, ctx, outputs, history} ->
-          msgs_with_call = endpoint_impl.maybe_append_assistant_tool_call(state, msgs, call)
-          args = Shared.extract_tool_call_args(call)
-
-          Sink.notify(
-            state.sink,
-            {:event, %{type: :tool_call_start, name: call.name, args: args, id: call.id}},
-            state.ref
-          )
-
-          output_text = Shared.loop_error_output(call, args)
-          normalized_output = Shared.normalize_tool_output(output_text)
-
-          Sink.notify(
-            state.sink,
-            {:event,
-             %{
-               type: :tool_call_result,
-               name: call.name,
-               args: args,
-               output: normalized_output,
-               id: call.id,
-               status: :error,
-               reason: :loop_detected
-             }},
-            state.ref
-          )
-
-          # Use endpoint-specific tool output appending
-          new_messages =
-            endpoint_impl.append_tool_output_message(
-              state,
-              msgs_with_call,
-              call,
-              normalized_output
-            )
-
-          payload = %{
-            id: call.id,
-            call_id: call.call_id || call.id,
-            name: call.name,
-            output: normalized_output
-          }
-
-          output_info = %{
-            call_id: call.id,
-            name: call.name,
-            args: args,
-            output: normalized_output
-          }
-
-          call_signature = {call.name, args}
-
-          {payload, {new_messages, ctx, [output_info | outputs], [call_signature | history]}}
-        end
-      )
-
-    payloads = Enum.reverse(payloads)
-    tool_outputs = Enum.reverse(tool_outputs)
-
-    # Use endpoint-specific handler for tool outputs
-    updated_state =
-      endpoint_impl.handle_tool_outputs(
-        state,
-        payloads,
-        messages,
-        tool_context,
-        tool_outputs,
-        call_history
-      )
+    maybe_notify_chunk(state, halt_message)
 
     %{
-      updated_state
-      | pending_calls: pending_calls,
-        status: :in_progress,
-        final_meta: Shared.append_tool_meta(state.final_meta, ready_calls)
+      state
+      | status: :completed,
+        pending_calls: [],
+        tool_payloads: [],
+        acc_chunks: [halt_message | state.acc_chunks],
+        final_meta:
+          Map.put(state.final_meta, :iteration_limit, %{tool: tool_name, limit: max_calls})
     }
   end
 
-  # Detects if we're in a tool call loop (same tool being called repeatedly with same args).
-  # Returns {:loop_detected, call_signature} if loop found, :no_loop otherwise.
-  defp detect_tool_loop(%State{tool_call_history: history, tool_context: context}, ready_calls) do
-    if loop_detection_disabled?(context) do
-      :no_loop
-    else
-      Shared.do_detect_tool_loop(history, ready_calls)
-    end
-  end
+  defp halt_due_to_consecutive_failures(%State{} = state, ready_calls) do
+    max_failures = Application.get_env(:aquila, :max_consecutive_tool_failures, 3)
 
-  defp loop_detection_disabled?(context) when is_map(context) do
-    Map.get(context, :disable_loop_detection) ||
-      Map.get(context, "disable_loop_detection") ||
-      false
-  end
+    tool_name =
+      case List.first(ready_calls) do
+        nil -> "unknown"
+        call -> call.name
+      end
 
-  defp loop_detection_disabled?(_), do: false
+    halt_message =
+      "Stopping due to #{max_failures} consecutive tool failures. " <>
+        "The tool '#{tool_name}' kept returning errors. " <>
+        "Please check the tool implementation or adjust your request."
+
+    maybe_notify_chunk(state, halt_message)
+
+    %{
+      state
+      | status: :completed,
+        pending_calls: [],
+        tool_payloads: [],
+        acc_chunks: [halt_message | state.acc_chunks],
+        final_meta:
+          Map.put(state.final_meta, :consecutive_failures, %{tool: tool_name, count: max_failures})
+    }
+  end
 
   defp normalize_tool_choice(choice) do
     case choice do
@@ -956,7 +923,8 @@ defmodule Aquila.Engine do
         # (e.g. _fallback_text from deep research, usage stats, response_id)
         tool_payloads: [],
         last_tool_outputs: [],
-        tool_call_history: []
+        tool_call_history: [],
+        consecutive_tool_failures: 0
     }
   end
 
@@ -971,8 +939,10 @@ defmodule Aquila.Engine do
         |> Map.put(:pending_calls, calls)
         |> Map.put(:error, nil)
 
-      executed_state = execute_tools(fallback_state)
-      %{executed_state | status: state.status}
+      case execute_tools(fallback_state) do
+        {:halt, halted_state} -> %{halted_state | status: state.status}
+        %State{} = executed_state -> %{executed_state | status: state.status}
+      end
     end
   end
 

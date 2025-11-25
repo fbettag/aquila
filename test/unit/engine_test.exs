@@ -570,6 +570,47 @@ defmodule Aquila.EngineTest do
     end
   end
 
+  defmodule InfiniteLoopTransport do
+    @behaviour Aquila.Transport
+
+    @impl true
+    def post(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def get(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def delete(_req), do: {:ok, %{"ok" => true}}
+
+    @impl true
+    def stream(_req, callback) do
+      round = Process.get(:infinite_loop_round, 0)
+      Process.put(:infinite_loop_round, round + 1)
+
+      args = %{"value" => 1}
+      call_id = "loopy-#{round + 1}"
+
+      callback.(%{
+        type: :tool_call,
+        id: call_id,
+        name: "loopy",
+        args_fragment: Jason.encode!(args),
+        call_id: call_id
+      })
+
+      callback.(%{
+        type: :tool_call_end,
+        id: call_id,
+        name: "loopy",
+        args: args,
+        call_id: call_id
+      })
+
+      callback.(%{type: :done, status: :requires_action})
+      {:ok, make_ref()}
+    end
+  end
+
   defmodule ForceToolTransport do
     @behaviour Aquila.Transport
 
@@ -1037,7 +1078,7 @@ defmodule Aquila.EngineTest do
         )
 
       assert response.text == "Done"
-      assert Process.get(:loop_tool_invocations) == 2
+      assert Process.get(:loop_tool_invocations) == 3
 
       final_request = Process.get(:loop_final_request)
       assert final_request
@@ -1045,13 +1086,51 @@ defmodule Aquila.EngineTest do
       body = Map.get(final_request, :body) || Map.get(final_request, "body") || %{}
       input_items = Map.get(body, :input) || Map.get(body, "input") || []
 
+      # Verify tool outputs are present in the final request
       assert Enum.any?(input_items, fn item ->
                type = Map.get(item, :type) || Map.get(item, "type")
                output = Map.get(item, :output) || Map.get(item, "output") || ""
-               type == "function_call_output" and String.contains?(output, "Tool loop detected")
+               type == "function_call_output" and String.contains?(output, "Found results")
              end)
 
       assert Process.get(:loop_round) >= 4
+    end
+
+    test "halts after repeated loop detections to prevent infinite retries" do
+      cleanup = fn ->
+        Process.delete(:infinite_loop_round)
+        Process.delete(:infinite_loop_tool_calls)
+      end
+
+      cleanup.()
+      on_exit(cleanup)
+      Process.put(:infinite_loop_tool_calls, 0)
+
+      tool =
+        Tool.new(
+          "loopy",
+          [
+            description: "Intentionally loops to test safeguards.",
+            parameters: %{"type" => "object", "properties" => %{}}
+          ],
+          fn _args, _ctx ->
+            count = Process.get(:infinite_loop_tool_calls, 0)
+            Process.put(:infinite_loop_tool_calls, count + 1)
+            {:ok, "still looping"}
+          end
+        )
+
+      response =
+        Engine.run("trigger loop guard",
+          transport: InfiniteLoopTransport,
+          tools: [tool],
+          endpoint: :responses,
+          base_url: "https://api.openai.com/v1/responses"
+        )
+
+      assert String.contains?(response.text, "Stopping after hitting the tool iteration limit")
+      assert Process.get(:infinite_loop_tool_calls) == 24
+      assert Process.get(:infinite_loop_round) <= 25
     end
   end
 

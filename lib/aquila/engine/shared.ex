@@ -167,7 +167,7 @@ defmodule Aquila.Engine.Shared do
 
     new_messages = endpoint_impl.append_tool_output_message(state, messages, call, output)
 
-    {payload, new_messages, new_context}
+    {payload, new_messages, new_context, status}
   end
 
   defp invoke_tool_function(function, args, context) when is_function(function, 2) do
@@ -376,63 +376,6 @@ defmodule Aquila.Engine.Shared do
   end
 
   def merge_tool_context(_current, patch), do: patch
-
-  ## Tool loop detection
-
-  @doc """
-  Detects if we're in a tool call loop (same tool being called repeatedly with same args).
-  Returns {:loop_detected, call_signature} if loop found, :no_loop otherwise.
-  """
-  def detect_tool_loop(history, context, ready_calls) do
-    if loop_detection_disabled?(context) do
-      :no_loop
-    else
-      do_detect_tool_loop(history, ready_calls)
-    end
-  end
-
-  @doc false
-  def do_detect_tool_loop(history, ready_calls) do
-    # Get signatures of calls we're about to make
-    new_signatures = Enum.map(ready_calls, fn call -> {call.name, call.args} end)
-
-    # Check if any of these signatures appear 2+ times in recent history (indicating loop)
-    Enum.find_value(new_signatures, :no_loop, fn signature ->
-      recent_count = Enum.count(Enum.take(history, 8), &(&1 == signature))
-      if recent_count >= 2, do: {:loop_detected, signature}, else: nil
-    end)
-  end
-
-  defp loop_detection_disabled?(context) when is_map(context) do
-    Map.get(context, :disable_loop_detection) ||
-      Map.get(context, "disable_loop_detection") ||
-      false
-  end
-
-  defp loop_detection_disabled?(_), do: false
-
-  @doc "Generates error output message for tool loop"
-  def loop_error_output(call, args) do
-    rendered_args = render_loop_args(args)
-
-    [
-      "Tool loop detected for ",
-      call.name,
-      ". This call was blocked because the same arguments were invoked repeatedly. ",
-      "Update the prompt or adjust the tool to return new information before calling it again.",
-      "\nArguments: ",
-      rendered_args
-    ]
-    |> IO.iodata_to_binary()
-  end
-
-  defp render_loop_args(args) when is_map(args) do
-    inspect(args, limit: 10, printable_limit: 200)
-  end
-
-  defp render_loop_args(args) do
-    inspect(args, limit: 10, printable_limit: 200)
-  end
 
   ## Tool call tracking (for streaming)
 

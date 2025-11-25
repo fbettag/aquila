@@ -13,7 +13,7 @@ defmodule Aquila.MixProject do
       docs: docs(),
       package: package(),
       test_coverage: [tool: ExCoveralls],
-      preferred_cli_env: [
+      preferred_envs: [
         quality: :test,
         coveralls: :test,
         "coveralls.html": :test,

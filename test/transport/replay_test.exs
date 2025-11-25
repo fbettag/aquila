@@ -90,7 +90,11 @@ defmodule Aquila.TransportReplayTest do
           "type" => "usage",
           "usage" => %{"total_tokens" => 42}
         }),
-        Jason.encode!(%{"request_id" => request_id, "type" => "response_ref", "id" => "resp_123"}),
+        Jason.encode!(%{
+          "request_id" => request_id,
+          "type" => "response_ref",
+          "id" => "resp_123"
+        }),
         Jason.encode!(%{
           "request_id" => request_id,
           "type" => "event",

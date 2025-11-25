@@ -170,37 +170,6 @@ defmodule Aquila.EngineSharedTest do
     end
   end
 
-  describe "detect_tool_loop/3" do
-    test "detects repeated signatures" do
-      history = [
-        {"calc", %{"x" => 1}},
-        {"calc", %{"x" => 1}}
-      ]
-
-      ready_calls = [%{name: "calc", args: %{"x" => 1}}]
-
-      assert {:loop_detected, {"calc", %{"x" => 1}}} =
-               Shared.detect_tool_loop(history, %{}, ready_calls)
-    end
-
-    test "respects disable flag in context" do
-      ready_calls = [%{name: "calc", args: %{"x" => 1}}]
-      context = %{disable_loop_detection: true}
-
-      assert :no_loop = Shared.detect_tool_loop([], context, ready_calls)
-    end
-  end
-
-  describe "loop_error_output/2" do
-    test "renders informative message" do
-      call = %{name: "calc"}
-      message = Shared.loop_error_output(call, %{"x" => 1})
-
-      assert message =~ "calc"
-      assert message =~ "Arguments"
-    end
-  end
-
   describe "tool call tracking" do
     test "track_tool_call appends new call" do
       calls =
@@ -355,11 +324,12 @@ defmodule Aquila.EngineSharedTest do
 
       call = %{name: "echo", id: "call-1", call_id: "call-1", args: %{"value" => 1}}
 
-      {payload, new_messages, new_context} =
+      {payload, new_messages, new_context, status} =
         Shared.invoke_tool(state, call, [], FakeEndpoint)
 
       assert payload.output == ~s({"context":{"context":"initial"},"value":1})
       assert new_context == %{context: :updated}
+      assert status == :ok
       assert [%{output: output}] = new_messages
       assert output == payload.output
 
@@ -381,10 +351,11 @@ defmodule Aquila.EngineSharedTest do
 
       call = %{name: "fails", id: "call-err", call_id: "call-err", args: %{}}
 
-      {payload, _messages, context} = Shared.invoke_tool(state, call, [], FakeEndpoint)
+      {payload, _messages, context, status} = Shared.invoke_tool(state, call, [], FakeEndpoint)
 
       assert payload.output =~ "Operation failed"
       assert context == %{}
+      assert status == :error
     end
   end
 end
