@@ -53,8 +53,11 @@ defmodule Aquila.Transport.Record do
       index = Cassette.next_index(cassette, opts)
 
       case resolve_mode(req, cassette, index, :sse) do
-        {:replay, _meta} -> replay_stream(req, cassette, index, callback)
-        :record -> record_stream(req, cassette, index, callback)
+        {:replay, _meta} ->
+          replay_stream(req, cassette, index, callback)
+
+        :record ->
+          with_cassette_lock(cassette, fn -> record_stream(req, cassette, index, callback) end)
       end
     else
       :no_cassette -> inner_transport().stream(strip_recorder_opts(req), callback)
@@ -68,8 +71,11 @@ defmodule Aquila.Transport.Record do
       index = Cassette.next_index(cassette, opts)
 
       case resolve_mode(req, cassette, index, {:http, method}) do
-        {:replay, _meta} -> replay_http(method, req, cassette, index)
-        :record -> record_http(method, req, cassette, index)
+        {:replay, _meta} ->
+          replay_http(method, req, cassette, index)
+
+        :record ->
+          with_cassette_lock(cassette, fn -> record_http(method, req, cassette, index) end)
       end
     else
       :no_cassette -> call_inner(method, strip_recorder_opts(req))
@@ -363,6 +369,13 @@ defmodule Aquila.Transport.Record do
   end
 
   defp put_index(req, index), do: %{req | opts: [cassette_index: index]}
+
+  # Serialize cassette recording to prevent concurrent writers from producing
+  # mismatched metadata/SSE files when the same cassette is recorded in
+  # multiple processes (e.g. async LiveView tasks during tests).
+  defp with_cassette_lock(cassette, fun) when is_function(fun, 0) do
+    :global.trans({:aquila_record, cassette}, fun)
+  end
 
   defp skip_verification(%{opts: opts} = req) when is_list(opts) do
     %{req | opts: Keyword.put(opts, :skip_verification, true)}

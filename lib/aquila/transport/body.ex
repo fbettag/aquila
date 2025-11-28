@@ -59,7 +59,27 @@ defmodule Aquila.Transport.Body do
     |> Enum.map(&normalize/1)
   end
 
+  # Strip assistant/tool messages (and their tool_calls) to avoid prompt drift
+  # when previous responses leak into the outgoing request body.
+  defp normalize_value("messages", value) when is_list(value) do
+    value
+    |> Enum.map(&normalize_message/1)
+    |> Enum.reject(&is_nil/1)
+  end
+
   defp normalize_value(_key, value), do: normalize(value)
+
+  defp normalize_message(%{"role" => role}) when role in ["assistant", "tool", "system"], do: nil
+  defp normalize_message(%{role: role}) when role in [:assistant, :tool, :system], do: nil
+
+  defp normalize_message(msg) when is_map(msg) do
+    msg
+    |> Map.delete("tool_calls")
+    |> Map.delete(:tool_calls)
+    |> normalize()
+  end
+
+  defp normalize_message(other), do: normalize(other)
 
   # Check if an item is a function_call_output
   defp function_call_output?(%{"type" => "function_call_output"}), do: true
@@ -71,6 +91,12 @@ defmodule Aquila.Transport.Body do
   defp drop_field?({:metadata, value}) when value in [%{}, nil], do: true
   defp drop_field?({"previous_response_id", _}), do: true
   defp drop_field?({:previous_response_id, _}), do: true
+  defp drop_field?({"tool_choice", _}), do: true
+  defp drop_field?({:tool_choice, _}), do: true
+  defp drop_field?({"tools", _}), do: true
+  defp drop_field?({:tools, _}), do: true
+  defp drop_field?({"tool_calls", _}), do: true
+  defp drop_field?({:tool_calls, _}), do: true
   defp drop_field?(_), do: false
 
   defp normalize_key(key) when is_atom(key), do: Atom.to_string(key)
