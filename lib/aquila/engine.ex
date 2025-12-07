@@ -856,8 +856,12 @@ defmodule Aquila.Engine do
     end
   end
 
+  # Only force tool choice for live API calls, not cassette replay.
+  # Cassette replay is deterministic and may have been recorded without
+  # the forced tool call, so we shouldn't inject extra requests.
   defp should_force_tool_choice?(%State{} = state) do
-    state.tools != [] and
+    is_nil(state.cassette) and
+      state.tools != [] and
       state.tool_call_history == [] and
       state.tool_choice == :auto and
       not state.tool_choice_forced? and
