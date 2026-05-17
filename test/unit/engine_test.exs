@@ -117,6 +117,66 @@ defmodule Aquila.EngineTest do
     end
   end
 
+  describe "request body construction" do
+    setup do
+      cleanup = fn ->
+        Process.delete(:silent_round)
+        Process.delete(:silent_requests)
+      end
+
+      cleanup.()
+      on_exit(cleanup)
+      :ok
+    end
+
+    test "chat prompt sends instructions exactly once as a system message" do
+      Engine.run("ping",
+        transport: @silent_transport,
+        endpoint: :chat,
+        model: "openai/gpt-4o",
+        instructions: "Be concise."
+      )
+
+      [request | _] = Process.get(:silent_requests, []) |> Enum.reverse()
+      messages = request.body.messages
+
+      assert [%{role: "system", content: "Be concise."}, %{role: "user", content: "ping"}] =
+               messages
+    end
+
+    test "responses prompt sends instructions only in the top-level field" do
+      Engine.run("ping",
+        transport: @silent_transport,
+        endpoint: :responses,
+        model: "openai/gpt-4o",
+        instructions: "Be concise."
+      )
+
+      [request | _] = Process.get(:silent_requests, []) |> Enum.reverse()
+      body = request.body
+
+      assert body.instructions == "Be concise."
+      assert [%{role: "user", content: [%{type: "input_text", text: "ping"}]}] = body.input
+    end
+
+    test "passes generation options through to endpoint request bodies" do
+      Engine.run("ping",
+        transport: @silent_transport,
+        endpoint: :responses,
+        model: "openai/gpt-4o",
+        temperature: 0.2,
+        max_output_tokens: 128,
+        provider_options: %{text: %{verbosity: "low"}}
+      )
+
+      [request | _] = Process.get(:silent_requests, []) |> Enum.reverse()
+
+      assert request.body.temperature == 0.2
+      assert request.body.max_output_tokens == 128
+      assert request.body.text == %{verbosity: "low"}
+    end
+  end
+
   defmodule SilentTransport do
     @behaviour Aquila.Transport
 
@@ -162,6 +222,30 @@ defmodule Aquila.EngineTest do
       callback.(%{type: :delta, content: "Hi"})
       callback.(%{type: :done, status: :completed, meta: %{usage: %{"output_tokens" => 1}}})
       {:ok, make_ref()}
+    end
+  end
+
+  describe "response metadata" do
+    setup do
+      Process.delete(:simple_stream_requests)
+      :ok
+    end
+
+    test "returns reusable conversation messages including assistant text" do
+      response =
+        Engine.run("ping",
+          transport: SimpleStreamTransport,
+          endpoint: :chat,
+          model: "openai/gpt-4o"
+        )
+
+      assert response.text == "Hi"
+      assert response.meta.request_messages == [%{role: :user, content: "ping"}]
+
+      assert response.meta.messages == [
+               %{role: :user, content: "ping"},
+               %{role: :assistant, content: "Hi"}
+             ]
     end
   end
 
@@ -367,7 +451,8 @@ defmodule Aquila.EngineTest do
           tools: [tool],
           endpoint: :responses,
           model: "gpt-test",
-          sink: :ignore
+          sink: :ignore,
+          force_tool_choice_on_miss: true
         )
 
       requests = Process.get(:force_tool_requests, []) |> Enum.reverse()
@@ -378,6 +463,27 @@ defmodule Aquila.EngineTest do
 
       assert Process.get(:force_tool_round) == 2
       assert Process.get(:fallback_tool_executed)
+    end
+
+    test "does not force tool choice by default when model skips optional tools" do
+      tool =
+        Tool.new("recall", fn _args ->
+          Process.put(:fallback_tool_executed, true)
+          {:ok, "fallback"}
+        end)
+
+      _response =
+        Engine.run("no tool call",
+          transport: __MODULE__.ForceToolTransport,
+          tools: [tool],
+          endpoint: :responses,
+          model: "gpt-test",
+          sink: :ignore
+        )
+
+      requests = Process.get(:force_tool_requests, []) |> Enum.reverse()
+      assert length(requests) == 1
+      refute Process.get(:fallback_tool_executed)
     end
 
     test "raises transport error and notifies sink" do

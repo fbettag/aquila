@@ -21,8 +21,16 @@ defmodule Aquila do
   * `:sink` – `Aquila.Sink.t()` implementation used for streaming callbacks.
   * `:previous_response_id` – continue a Responses API conversation with a
     new instruction set (switch personas mid-thread).
+  * `:temperature`, `:top_p`, `:max_tokens`, `:max_completion_tokens`,
+    `:max_output_tokens`, `:response_format`, `:text`, `:user`,
+    `:parallel_tool_calls`, `:service_tier`, `:truncation`, and
+    `:max_tool_calls` – provider request options passed through when present.
+  * `:provider_options` – map or keyword list of additional provider-specific
+    request fields merged into the endpoint body.
   * `:cassette` – instruct the recorder transport which cassette to use.
   * `:store` – persist Responses API output on OpenAI’s servers when `true`.
+  * `:force_tool_choice_on_miss` – opt into a compatibility retry that forces a
+    tool choice when a model completes without calling any declared tools.
 
   See the guides shipped with the project—especially *Getting Started*,
   *Streaming and Sinks*, *LiveView Integration*, *Oban Integration*, and
@@ -58,6 +66,14 @@ defmodule Aquila do
   * `:tools` – enable tool/function calling.
   * `:previous_response_id` – reuse prior context while changing
     instructions for the Responses API.
+  * `:temperature`, `:top_p`, `:max_tokens`, `:max_completion_tokens`,
+    `:max_output_tokens`, `:response_format`, `:text`, `:user`,
+    `:parallel_tool_calls`, `:service_tier`, `:truncation`, and
+    `:max_tool_calls` – provider request options passed through when present.
+  * `:provider_options` – map or keyword list of additional provider-specific
+    request fields merged into the endpoint body.
+  * `:force_tool_choice_on_miss` – opt into a compatibility retry that forces a
+    tool choice when a model completes without calling any declared tools.
   * `:metadata` – attach custom metadata that transports may log.
   * `:cassette` – name of the cassette used by the recorder transport.
   * `:store` – set to `true` to persist Responses output server-side.

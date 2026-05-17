@@ -435,7 +435,8 @@ defmodule Aquila.ResponsesEngineTest do
           instructions: nil,
           response_id: nil,
           previous_response_id: nil,
-          reasoning: nil
+          reasoning: nil,
+          request_options: %{}
         },
         overrides
       )
@@ -478,15 +479,13 @@ defmodule Aquila.ResponsesEngineTest do
       assert body.reasoning == %{effort: "medium"}
       assert body.store == true
 
-      [first_input, second_input] = body.input
-      assert first_input.role == "user"
-      assert [%{type: "input_text", text: "ping"}] = first_input.content
-
-      assert %{
-               type: "function_call_output",
-               call_id: "call-1",
-               output: %{"result" => 3}
-             } = second_input
+      assert [
+               %{
+                 type: "function_call_output",
+                 call_id: "call-1",
+                 output: %{"result" => 3}
+               }
+             ] = body.input
 
       [flattened_tool] = body.tools
       type = fetch_key(flattened_tool, :type, "type")
@@ -500,6 +499,36 @@ defmodule Aquila.ResponsesEngineTest do
       assert description == "Adds numbers"
       assert parameters["properties"]["x"]
       assert strict == false
+    end
+
+    test "includes original messages with tool payloads when no previous response id is available" do
+      state =
+        base_state(%{
+          tool_payloads: [%{call_id: "call-1", output: "3"}]
+        })
+
+      body = Responses.build_body(state, true)
+
+      assert [first_input, second_input] = body.input
+      assert first_input.role == "user"
+      assert [%{type: "input_text", text: "ping"}] = first_input.content
+
+      assert %{
+               type: "function_call_output",
+               call_id: "call-1",
+               output: "3"
+             } = second_input
+    end
+
+    test "passes generation request options through" do
+      body =
+        base_state(%{
+          request_options: %{temperature: 0.1, max_output_tokens: 64}
+        })
+        |> Responses.build_body(false)
+
+      assert body.temperature == 0.1
+      assert body.max_output_tokens == 64
     end
 
     test "omits strict flag when all properties required" do

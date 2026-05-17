@@ -363,5 +363,5 @@ defmodule Aquila.Transport.Replay do
   defp decode_status("succeeded"), do: :succeeded
   defp decode_status("done"), do: :done
   defp decode_status("requires_action"), do: :requires_action
-  defp decode_status(other) when is_binary(other), do: String.to_atom(other)
+  defp decode_status(other) when is_binary(other), do: other
 end

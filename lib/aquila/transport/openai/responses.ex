@@ -292,6 +292,23 @@ defmodule Aquila.Transport.OpenAI.Responses do
     "response.research_message."
   ]
 
+  @deep_research_events ~w(
+    in_progress
+    output_item_added
+    output_item_done
+    web_search_call_in_progress
+    web_search_call_searching
+    web_search_call_completed
+    reasoning_delta
+    reasoning_done
+    summary_delta
+    summary_done
+    research_step_added
+    research_step_done
+    research_message_delta
+    research_message_done
+  )a
+
   defp deep_research_event_type?(type) when is_binary(type) do
     Enum.any?(@deep_research_prefixes, &String.starts_with?(type, &1))
   end
@@ -309,10 +326,12 @@ defmodule Aquila.Transport.OpenAI.Responses do
   end
 
   defp deep_research_event_name(type) when is_binary(type) do
-    type
-    |> String.replace_prefix("response.", "")
-    |> String.replace(".", "_")
-    |> String.to_atom()
+    event_name =
+      type
+      |> String.replace_prefix("response.", "")
+      |> String.replace(".", "_")
+
+    Enum.find(@deep_research_events, event_name, &(Atom.to_string(&1) == event_name))
   end
 
   defp atomise_deep(%{} = map) do

@@ -42,32 +42,45 @@ defmodule Aquila.Transport.Body do
   def normalize(body), do: body
 
   defp normalize_map(map) do
+    continuation? =
+      Map.has_key?(map, "previous_response_id") or
+        Map.has_key?(map, :previous_response_id)
+
     map
-    |> Enum.map(fn {key, value} -> {normalize_key(key), normalize_value(key, value)} end)
+    |> Enum.map(fn {key, value} ->
+      normalized_key = normalize_key(key)
+      {normalized_key, normalize_value(normalized_key, value, continuation?)}
+    end)
     |> Enum.reject(&drop_field?/1)
     |> Enum.sort_by(&elem(&1, 0))
     |> Map.new()
   end
 
   # Normalize values with special handling for certain keys
-  defp normalize_value("input", value) when is_list(value) do
-    # Filter out function_call_output items from cassette comparison
-    # These are tool outputs from previous conversation turns - ephemeral state
-    # that shouldn't be part of the prompt hash for cassette matching
+  defp normalize_value("input", value, true) when is_list(value) do
+    # Continuation requests are anchored by previous_response_id. Old cassettes
+    # may include the original user input again, while corrected requests only
+    # send new function_call_output items. Compare the actual continuation
+    # payload so prompt replay remains strict without preserving duplication.
+    tool_outputs = Enum.filter(value, &function_call_output?/1)
+
     value
-    |> Enum.reject(&function_call_output?/1)
+    |> maybe_only_tool_outputs(tool_outputs)
     |> Enum.map(&normalize/1)
   end
 
   # Strip assistant/tool messages (and their tool_calls) to avoid prompt drift
   # when previous responses leak into the outgoing request body.
-  defp normalize_value("messages", value) when is_list(value) do
+  defp normalize_value("messages", value, _continuation?) when is_list(value) do
     value
     |> Enum.map(&normalize_message/1)
     |> Enum.reject(&is_nil/1)
   end
 
-  defp normalize_value(_key, value), do: normalize(value)
+  defp normalize_value(_key, value, _continuation?), do: normalize(value)
+
+  defp maybe_only_tool_outputs(_value, [_ | _] = tool_outputs), do: tool_outputs
+  defp maybe_only_tool_outputs(value, []), do: value
 
   defp normalize_message(%{"role" => role}) when role in ["assistant", "tool", "system"], do: nil
   defp normalize_message(%{role: role}) when role in [:assistant, :tool, :system], do: nil
@@ -86,7 +99,7 @@ defmodule Aquila.Transport.Body do
   defp function_call_output?(%{type: "function_call_output"}), do: true
   defp function_call_output?(_), do: false
 
-  # Drop fields that are ephemeral (conversation state) rather than prompt content
+  # Drop fields that are absent/empty rather than prompt content.
   defp drop_field?({"metadata", value}) when value in [%{}, nil], do: true
   defp drop_field?({:metadata, value}) when value in [%{}, nil], do: true
   defp drop_field?({"previous_response_id", _}), do: true

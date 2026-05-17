@@ -36,6 +36,7 @@ defmodule Aquila.Engine do
       :metadata,
       :instructions,
       :reasoning,
+      :request_options,
       :sink,
       :stream?,
       :ref,
@@ -65,6 +66,7 @@ defmodule Aquila.Engine do
       tool_message_format: :text,
       tool_choice: :auto,
       tool_choice_forced?: false,
+      force_tool_choice_on_miss?: false,
       last_tool_outputs: [],
       tool_call_history: [],
       role_retry_count: 0
@@ -91,9 +93,9 @@ defmodule Aquila.Engine do
       Keyword.get(opts, :transport) ||
         Application.get_env(:aquila, :transport, Aquila.Transport.OpenAI)
 
-    tools = normalize_tools(Keyword.get(opts, :tools, []))
+    tools = Shared.normalize_tools(Keyword.get(opts, :tools, []))
     model = opts[:model] || config(:default_model) || "gpt-4o-mini"
-    reasoning = normalize_reasoning(opts[:reasoning])
+    reasoning = Shared.normalize_reasoning(opts[:reasoning])
     base_url = opts[:base_url] || config(:base_url) || "https://api.openai.com/v1"
 
     endpoint =
@@ -103,12 +105,13 @@ defmodule Aquila.Engine do
       |> select_reasoning_endpoint(reasoning)
 
     sink = Keyword.get(opts, :sink, if(stream?, do: Sink.pid(self()), else: :ignore))
-    metadata = normalize_metadata(opts[:metadata])
+    metadata = Shared.normalize_metadata(opts[:metadata])
+    request_options = normalize_request_options(opts)
     timeout = opts[:timeout] || config(:request_timeout) || 30_000
-    api_key = resolve_api_key(opts[:api_key] || config(:api_key))
+    api_key = Shared.resolve_api_key(opts[:api_key] || config(:api_key))
     messages = normalize_input(input, opts)
     tool_defs = Enum.map(tools, &Tool.to_openai/1)
-    tool_map = build_tool_map(tools)
+    tool_map = Shared.build_tool_map(tools)
     ref = Keyword.get(opts, :ref, make_ref())
     cassette = Keyword.get(opts, :cassette)
     cassette_index = Keyword.get(opts, :cassette_index)
@@ -117,6 +120,7 @@ defmodule Aquila.Engine do
     store = Keyword.get(opts, :store)
     tool_context = Keyword.get(opts, :tool_context)
     tool_choice = normalize_tool_choice(Keyword.get(opts, :tool_choice, :auto))
+    force_tool_choice_on_miss? = Keyword.get(opts, :force_tool_choice_on_miss, false)
 
     telemetry_meta = %{endpoint: endpoint, model: to_string(model), stream?: stream?}
     telemetry = %{start_time: System.monotonic_time(), meta: telemetry_meta}
@@ -130,6 +134,7 @@ defmodule Aquila.Engine do
       metadata: metadata,
       instructions: instructions,
       reasoning: reasoning,
+      request_options: request_options,
       sink: sink,
       stream?: stream?,
       ref: ref,
@@ -143,6 +148,7 @@ defmodule Aquila.Engine do
       tool_map: tool_map,
       tool_context: tool_context,
       tool_choice: tool_choice,
+      force_tool_choice_on_miss?: force_tool_choice_on_miss?,
       previous_response_id: previous_response_id,
       telemetry: telemetry
     }
@@ -524,87 +530,46 @@ defmodule Aquila.Engine do
     ]
   end
 
-  @builtin_tools ~w(code_interpreter file_search web_search_preview)a
-  @builtin_tool_strings Enum.map(@builtin_tools, &Atom.to_string/1)
-
-  defp normalize_tools(list) do
-    Enum.map(list, &normalize_tool/1)
-  end
-
-  defp normalize_tool(%Tool{} = tool), do: tool
-
-  defp normalize_tool(%{name: name, parameters: parameters} = map) do
-    function = Map.get(map, :function) || Map.get(map, :fun) || Map.fetch!(map, :fn)
-    Tool.new(name, [description: Map.get(map, :description), parameters: parameters], function)
-  end
-
-  defp normalize_tool(%{"name" => name, "parameters" => parameters} = map) do
-    function = Map.get(map, "function") || Map.get(map, "fun") || Map.fetch!(map, "fn")
-    Tool.new(name, [description: Map.get(map, "description"), parameters: parameters], function)
-  end
-
-  defp normalize_tool(%{type: type} = map) when is_atom(type) or is_binary(type) do
-    %{map | type: builtin_type!(type)}
-  end
-
-  defp normalize_tool(%{"type" => type} = map) when is_atom(type) or is_binary(type) do
-    Map.put(map, "type", builtin_type!(type))
-  end
-
-  defp normalize_tool(type) when is_atom(type) or is_binary(type) do
-    %{type: builtin_type!(type)}
-  end
-
-  defp normalize_tool(other) do
-    raise ArgumentError, "invalid tool: #{inspect(other)}"
-  end
-
-  defp builtin_type!(type) when is_atom(type) do
-    type |> Atom.to_string() |> builtin_type!()
-  end
-
-  defp builtin_type!(type) when is_binary(type) do
-    if type in @builtin_tool_strings do
-      type
-    else
-      raise ArgumentError, "unknown built-in tool: #{inspect(type)}"
-    end
-  end
-
-  defp build_tool_map(tools) do
-    tools
-    |> Enum.filter(&match?(%Tool{}, &1))
-    |> Map.new(&{&1.name, &1})
-  end
-
   defp normalize_input(input, opts) do
     cond do
       Keyword.has_key?(opts, :messages) -> Message.normalize(opts[:messages], opts)
       is_list(input) -> Message.normalize(input, opts)
-      true -> Message.normalize(input, opts)
+      true -> Message.normalize(input, Keyword.drop(opts, [:instruction, :instructions]))
     end
   end
 
-  defp normalize_metadata(nil), do: %{}
-  defp normalize_metadata(map) when is_map(map), do: map
-  defp normalize_metadata(list) when is_list(list), do: Map.new(list)
-  defp normalize_metadata(_), do: %{}
+  @request_option_keys [
+    :temperature,
+    :top_p,
+    :max_tokens,
+    :max_completion_tokens,
+    :max_output_tokens,
+    :response_format,
+    :text,
+    :user,
+    :parallel_tool_calls,
+    :service_tier,
+    :truncation,
+    :max_tool_calls
+  ]
 
-  defp normalize_reasoning(nil), do: nil
-  defp normalize_reasoning(reasoning) when is_map(reasoning), do: reasoning
+  defp normalize_request_options(opts) do
+    provider_options =
+      case Keyword.get(opts, :provider_options, %{}) do
+        %{} = map -> map
+        list when is_list(list) -> Map.new(list)
+        _other -> %{}
+      end
 
-  defp normalize_reasoning(reasoning) when is_binary(reasoning) do
-    %{effort: String.downcase(reasoning)}
+    opts
+    |> Keyword.take(@request_option_keys)
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.new()
+    |> Map.merge(provider_options)
   end
-
-  defp normalize_reasoning(_), do: nil
 
   defp select_reasoning_endpoint(_endpoint, reasoning) when not is_nil(reasoning), do: :responses
   defp select_reasoning_endpoint(endpoint, _), do: endpoint
-
-  defp resolve_api_key({:system, var}) when is_binary(var), do: System.get_env(var)
-  defp resolve_api_key(key) when is_binary(key), do: key
-  defp resolve_api_key(_), do: nil
 
   defp config(key) do
     :aquila |> Application.get_env(:openai, []) |> Keyword.get(key)
@@ -633,10 +598,11 @@ defmodule Aquila.Engine do
       |> Map.put(:endpoint, state.endpoint)
       |> Map.put(:status, state.status)
       |> maybe_put_usage(state.usage)
-      |> Map.put(:messages, Message.to_list(state.messages))
+      |> Map.put(:request_messages, Message.to_list(state.messages))
       |> maybe_put(:response_id, state.response_id)
 
     {text, meta} = resolve_text(chunks_text, fallback_text, meta, state)
+    meta = Map.put(meta, :messages, Message.to_list(conversation_messages(state.messages, text)))
 
     raw = Enum.reverse(state.raw_events)
 
@@ -747,6 +713,9 @@ defmodule Aquila.Engine do
   end
 
   defp build_extra_meta(_), do: %{}
+
+  defp conversation_messages(messages, ""), do: messages
+  defp conversation_messages(messages, text), do: messages ++ [Message.new(:assistant, text)]
 
   defp merge_meta(meta, extra) when extra == %{}, do: meta
 
@@ -864,6 +833,7 @@ defmodule Aquila.Engine do
       state.tools != [] and
       state.tool_call_history == [] and
       state.tool_choice == :auto and
+      state.force_tool_choice_on_miss? and
       not state.tool_choice_forced? and
       not assistant_has_content?(state.messages)
   end

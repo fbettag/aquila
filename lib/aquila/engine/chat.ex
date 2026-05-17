@@ -32,11 +32,13 @@ defmodule Aquila.Engine.Chat do
         state.messages
       end
 
-    base = %{
-      model: state.model,
-      messages: Enum.map(messages, &Message.to_chat_map/1),
-      stream: stream?
-    }
+    base =
+      %{
+        model: state.model,
+        messages: Enum.map(messages, &Message.to_chat_map/1),
+        stream: stream?
+      }
+      |> Map.merge(Map.get(state, :request_options, %{}))
 
     base =
       if state.tool_defs == [] do

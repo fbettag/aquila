@@ -24,4 +24,29 @@ defmodule Aquila.TransportBodyTest do
 
     assert Body.normalize([%{alpha: 1}, %{beta: 2}]) == [%{"alpha" => 1}, %{"beta" => 2}]
   end
+
+  test "normalize preserves continuation payloads and drops duplicated prior input" do
+    recorded_shape = %{
+      previous_response_id: "resp_123",
+      input: [
+        %{role: "user", content: [%{type: "input_text", text: "calculate"}]},
+        %{type: "function_call_output", call_id: "call_1", output: "4"}
+      ]
+    }
+
+    corrected_shape = %{
+      previous_response_id: "resp_123",
+      input: [
+        %{type: "function_call_output", call_id: "call_1", output: "4"}
+      ]
+    }
+
+    assert Body.normalize(recorded_shape) == Body.normalize(corrected_shape)
+
+    assert Body.normalize(corrected_shape) == %{
+             "input" => [
+               %{"call_id" => "call_1", "output" => "4", "type" => "function_call_output"}
+             ]
+           }
+  end
 end

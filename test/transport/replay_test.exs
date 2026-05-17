@@ -177,7 +177,7 @@ defmodule Aquila.TransportReplayTest do
              %{type: :done, status: :completed, meta: %{}},
              %{type: :done, status: :completed, meta: %{}},
              %{type: :done, status: :done, meta: %{}},
-             %{type: :done, status: :custom_status, meta: %{}},
+             %{type: :done, status: "custom_status", meta: %{}},
              %{type: :usage, usage: %{"total_tokens" => 42}},
              %{type: :response_ref, id: "resp_123"},
              %{type: :event, payload: %{"payload" => %{"custom" => "value"}, "request_id" => 1}},

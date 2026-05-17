@@ -26,20 +26,28 @@ defmodule Aquila.Engine.Responses do
   @impl true
   def build_body(state, stream?) do
     # For Responses API, tool outputs are added to the input array as function_call_output items
-    input_items = Enum.map(state.messages, &message_to_response/1)
+    previous_response_id = state.response_id || state.previous_response_id
+    tool_output_items = Enum.map(state.tool_payloads, &tool_payload_to_function_call_output/1)
 
-    input_items_with_tool_outputs =
-      if state.tool_payloads != [] do
-        input_items ++ Enum.map(state.tool_payloads, &tool_payload_to_function_call_output/1)
-      else
-        input_items
+    input_items =
+      cond do
+        previous_response_id && tool_output_items != [] ->
+          tool_output_items
+
+        tool_output_items != [] ->
+          Enum.map(state.messages, &message_to_response/1) ++ tool_output_items
+
+        true ->
+          Enum.map(state.messages, &message_to_response/1)
       end
 
-    base = %{
-      model: state.model,
-      input: input_items_with_tool_outputs,
-      stream: stream?
-    }
+    base =
+      %{
+        model: state.model,
+        input: input_items,
+        stream: stream?
+      }
+      |> Map.merge(Map.get(state, :request_options, %{}))
 
     # Always include tools if available
     base =
@@ -52,7 +60,7 @@ defmodule Aquila.Engine.Responses do
     base
     |> Shared.maybe_put(:metadata, metadata_for_request(state))
     |> Shared.maybe_put(:instructions, state.instructions)
-    |> Shared.maybe_put(:previous_response_id, state.response_id || state.previous_response_id)
+    |> Shared.maybe_put(:previous_response_id, previous_response_id)
     |> Shared.maybe_put(:reasoning, state.reasoning)
     |> Shared.maybe_put(:store, state.store)
   end

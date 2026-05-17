@@ -27,3 +27,7 @@ ai-*.tar
 /.mix/
 
 /.elixir_ls
+
+# Local environment variables and secrets.
+.env
+.env.*

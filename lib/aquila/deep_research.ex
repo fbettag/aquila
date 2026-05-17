@@ -15,6 +15,7 @@ defmodule Aquila.DeepResearch do
   the required `web_search_preview` tool is configured unless explicitly provided.
   """
 
+  alias Aquila.Engine.Shared
   alias Aquila.{Cassette, Message, Tool}
 
   @default_model "openai/o3-deep-research-2025-06-26"
@@ -117,10 +118,10 @@ defmodule Aquila.DeepResearch do
     api_key = api_key!(opts)
     model = model(opts)
 
-    messages = Message.normalize(input, opts)
+    messages = Message.normalize(input, Keyword.drop(opts, [:instruction, :instructions]))
     instructions = opts[:instructions] || opts[:instruction]
     previous_response_id = opts[:previous_response_id] || opts[:response_id]
-    metadata = normalize_metadata(opts[:metadata])
+    metadata = Shared.normalize_metadata(opts[:metadata])
 
     body =
       %{
@@ -135,7 +136,7 @@ defmodule Aquila.DeepResearch do
       |> maybe_put(:metadata, metadata)
       |> maybe_put(:store, opts[:store])
       |> maybe_put(:temperature, opts[:temperature])
-      |> maybe_put(:reasoning, normalize_reasoning(opts[:reasoning]))
+      |> maybe_put(:reasoning, Shared.normalize_reasoning(opts[:reasoning]))
       |> maybe_put(:response_format, opts[:response_format])
       |> maybe_put(:max_output_tokens, opts[:max_output_tokens])
 
@@ -250,7 +251,7 @@ defmodule Aquila.DeepResearch do
       nil -> config(:api_key)
       key -> key
     end
-    |> resolve_api_key()
+    |> Shared.resolve_api_key()
     |> case do
       nil ->
         raise ArgumentError,
@@ -292,16 +293,6 @@ defmodule Aquila.DeepResearch do
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
-  defp normalize_metadata(nil), do: %{}
-  defp normalize_metadata(map) when is_map(map), do: map
-  defp normalize_metadata(list) when is_list(list), do: Map.new(list)
-  defp normalize_metadata(_), do: %{}
-
-  defp normalize_reasoning(nil), do: nil
-  defp normalize_reasoning(map) when is_map(map), do: map
-  defp normalize_reasoning(value) when is_binary(value), do: %{effort: value}
-  defp normalize_reasoning(_), do: nil
-
   defp apply_cassette_defaults(opts) do
     cond do
       Keyword.has_key?(opts, :cassette) ->
@@ -324,8 +315,4 @@ defmodule Aquila.DeepResearch do
   defp config(key) do
     Application.get_env(:aquila, :openai, []) |> Keyword.get(key)
   end
-
-  defp resolve_api_key({:system, var}) when is_binary(var), do: System.get_env(var)
-  defp resolve_api_key(key) when is_binary(key), do: key
-  defp resolve_api_key(_), do: nil
 end
