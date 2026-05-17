@@ -16,7 +16,7 @@ requests, and enabling streaming output.
 1. Add the dependency and fetch packages (Hex preferred):
 
     ```elixir
-    {:aquila, "~> 0.1.0"}
+    {:aquila, "~> 0.1.2"}
     # or, for edge builds:
     # {:aquila, github: "fbettag/aquila"}
     ```

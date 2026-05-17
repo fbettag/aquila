@@ -41,7 +41,7 @@ Add Aquila to your dependencies from Hex (preferred) or directly from GitHub:
 ```elixir
 def deps do
   [
-    {:aquila, "~> 0.1.0"}
+    {:aquila, "~> 0.1.2"}
     # or, for bleeding edge development:
     # {:aquila, github: "fbettag/aquila"}
   ]
