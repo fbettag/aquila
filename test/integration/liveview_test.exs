@@ -88,6 +88,17 @@ defmodule Aquila.LiveViewTest do
                  socket
                )
     end
+
+    test "requires the configured component id for research events" do
+      socket = TestLive.new_socket()
+
+      assert_raise ArgumentError, ~r/could not find :test_id in assigns/, fn ->
+        TestLive.handle_info(
+          {:aquila_stream_research_event, "session_123", %{type: :progress}},
+          socket
+        )
+      end
+    end
   end
 
   describe "Aquila.LiveView without optional params" do
@@ -107,6 +118,27 @@ defmodule Aquila.LiveViewTest do
       assert config.persistence == nil
       assert config.timeout == 120_000
       assert config.forward_to_component == nil
+    end
+
+    test "leaves ordinary stream events unchanged without a component" do
+      socket = %{assigns: %{}}
+
+      assert {:noreply, ^socket} =
+               MinimalTestLive.handle_info(
+                 {:aquila_stream_delta, "session_123", "content"},
+                 socket
+               )
+    end
+
+    test "raises a useful error for research events without a component" do
+      socket = %{assigns: %{}}
+
+      assert_raise ArgumentError, ~r/no :forward_to_component was configured/, fn ->
+        MinimalTestLive.handle_info(
+          {:aquila_stream_research_event, "session_123", %{type: :progress}},
+          socket
+        )
+      end
     end
   end
 end

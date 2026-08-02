@@ -90,28 +90,11 @@ defmodule Aquila.LiveView do
 
       # Handle streaming delta events
       def handle_info({:aquila_stream_delta, session_id, content}, socket) do
-        unquote(handle_forward_event(:streaming_delta, quote(do: content)))
+        Aquila.LiveView.forward_event(@aquila_forward_to, socket, :streaming_delta, content)
       end
 
       def handle_info({:aquila_stream_research_event, session_id, payload}, socket) do
-        case @aquila_forward_to do
-          nil ->
-            raise ArgumentError,
-                  "Aquila.LiveView received :aquila_stream_research_event but no :forward_to_component was configured. Add forward_to_component: {YourComponent, :assign_key} to handle Deep Research events."
-
-          {component_module, assign_key} ->
-            component_id =
-              Map.get(socket.assigns, assign_key) ||
-                raise ArgumentError,
-                      "Aquila.LiveView could not find #{inspect(assign_key)} in assigns while forwarding :aquila_stream_research_event. Ensure the LiveView sets this assign before streaming starts."
-
-            Phoenix.LiveView.send_update(
-              component_module,
-              [{:id, component_id}, {:streaming_research_event, {session_id, payload}}]
-            )
-
-            {:noreply, socket}
-        end
+        Aquila.LiveView.forward_research_event(@aquila_forward_to, socket, session_id, payload)
       end
 
       # Handle tool call start events - ignore for now
@@ -123,51 +106,70 @@ defmodule Aquila.LiveView do
       def handle_info({:aquila_stream_tool_call, session_id, :end, metadata}, socket) do
         tool_name = Map.get(metadata, :name) || Map.get(metadata, "name")
         output = Map.get(metadata, :output) || Map.get(metadata, "output")
-        unquote(handle_forward_event(:streaming_tool_result, quote(do: {tool_name, output})))
+
+        Aquila.LiveView.forward_event(
+          @aquila_forward_to,
+          socket,
+          :streaming_tool_result,
+          {tool_name, output}
+        )
       end
 
       # Legacy format for simple tool calls
       def handle_info({:aquila_stream_tool_call, session_id, tool, result}, socket) do
-        unquote(handle_forward_event(:streaming_tool_result, quote(do: {tool, result})))
+        Aquila.LiveView.forward_event(
+          @aquila_forward_to,
+          socket,
+          :streaming_tool_result,
+          {tool, result}
+        )
       end
 
       # Handle usage events
       def handle_info({:aquila_stream_usage, session_id, usage}, socket) do
-        unquote(handle_forward_event(:streaming_usage, quote(do: usage)))
+        Aquila.LiveView.forward_event(@aquila_forward_to, socket, :streaming_usage, usage)
       end
 
       # Handle completion events
       def handle_info({:aquila_stream_complete, session_id}, socket) do
-        unquote(handle_forward_event(:streaming_complete, quote(do: true)))
+        Aquila.LiveView.forward_event(@aquila_forward_to, socket, :streaming_complete, true)
       end
 
       # Handle error events
       def handle_info({:aquila_stream_error, session_id, reason}, socket) do
-        unquote(handle_forward_event(:streaming_error, quote(do: reason)))
+        Aquila.LiveView.forward_event(@aquila_forward_to, socket, :streaming_error, reason)
       end
     end
   end
 
-  defp handle_forward_event(event_type, value_ast) do
-    quote do
-      case @aquila_forward_to do
-        nil ->
-          # No forwarding configured, just return socket
-          {:noreply, socket}
+  @doc false
+  def forward_event(nil, socket, _event_type, _value), do: {:noreply, socket}
 
-        {component_module, assign_key} ->
-          # Forward to component
-          component_id = Map.get(socket.assigns, assign_key)
-
-          if component_id do
-            Phoenix.LiveView.send_update(
-              component_module,
-              [{:id, component_id}, {unquote(event_type), unquote(value_ast)}]
-            )
-          end
-
-          {:noreply, socket}
-      end
+  def forward_event({component_module, assign_key}, socket, event_type, value) do
+    if component_id = Map.get(socket.assigns, assign_key) do
+      Phoenix.LiveView.send_update(component_module, [{:id, component_id}, {event_type, value}])
     end
+
+    {:noreply, socket}
+  end
+
+  @doc false
+  def forward_research_event(nil, _socket, _session_id, _payload) do
+    raise ArgumentError,
+          "Aquila.LiveView received :aquila_stream_research_event but no :forward_to_component was configured. Add forward_to_component: {YourComponent, :assign_key} to handle Deep Research events."
+  end
+
+  def forward_research_event({component_module, assign_key}, socket, session_id, payload) do
+    component_id =
+      Map.get(socket.assigns, assign_key) ||
+        raise ArgumentError,
+              "Aquila.LiveView could not find #{inspect(assign_key)} in assigns while forwarding :aquila_stream_research_event. Ensure the LiveView sets this assign before streaming starts."
+
+    Phoenix.LiveView.send_update(
+      component_module,
+      [{:id, component_id}, {:streaming_research_event, {session_id, payload}}]
+    )
+
+    {:noreply, socket}
   end
 end
