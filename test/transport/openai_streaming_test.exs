@@ -379,6 +379,22 @@ defmodule Aquila.OpenAITransportStreamingTest do
     assert meta[:model] == "gpt-test"
   end
 
+  test "chat stream tolerates standalone usage and metadata frames" do
+    events = [
+      sse_event(%{"provider" => "gateway", "request_id" => "route_1"}),
+      sse_event(%{"usage" => %{"prompt_tokens" => 5, "completion_tokens" => 2}}),
+      @done_event
+    ]
+
+    assert [
+             %{
+               type: :usage,
+               usage: %{"prompt_tokens" => 5, "completion_tokens" => 2}
+             },
+             %{type: :done, status: :completed}
+           ] = run_stream(events, %{endpoint: :chat})
+  end
+
   test "chat stream emits tool call events" do
     payload = %{
       "id" => "chat_tool",

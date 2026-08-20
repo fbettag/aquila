@@ -24,7 +24,7 @@ defmodule Aquila.Transport.OpenAI.Chat do
   end
 
   # Main chat normalization
-  defp normalize_chat(state, %{"choices" => choices} = payload) do
+  defp normalize_chat(state, %{"choices" => choices} = payload) when is_list(choices) do
     meta = Map.take(payload, ["id", "model"]) |> atomise_keys()
 
     {new_state, all_events} =
@@ -60,6 +60,12 @@ defmodule Aquila.Transport.OpenAI.Chat do
       if finish_reason == "tool_calls", do: %{new_state | tool_calls: %{}}, else: new_state
 
     {final_state, final_events}
+  end
+
+  # OpenAI-compatible gateways may emit routing metadata or a standalone
+  # usage frame without `choices`. Keep the stream alive and retain usage.
+  defp normalize_chat(state, payload) when is_map(payload) do
+    {state, usage_events(payload)}
   end
 
   defp maybe_add_delta(events, nil), do: events
