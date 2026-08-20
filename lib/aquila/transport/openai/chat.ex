@@ -23,6 +23,18 @@ defmodule Aquila.Transport.OpenAI.Chat do
     {new_state, events}
   end
 
+  @doc false
+  def normalize_response(state, payload, callback) do
+    payload =
+      Map.update(payload, "choices", [], fn choices ->
+        Enum.map(choices, fn choice ->
+          Map.put(choice, "delta", choice["delta"] || choice["message"] || %{})
+        end)
+      end)
+
+    normalize(state, payload, callback)
+  end
+
   # Main chat normalization
   defp normalize_chat(state, %{"choices" => choices} = payload) when is_list(choices) do
     meta = Map.take(payload, ["id", "model"]) |> atomise_keys()

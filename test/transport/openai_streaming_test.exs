@@ -395,6 +395,38 @@ defmodule Aquila.OpenAITransportStreamingTest do
            ] = run_stream(events, %{endpoint: :chat})
   end
 
+  test "chat stream accepts a non-streaming JSON response from a compatible gateway" do
+    body =
+      Jason.encode!(%{
+        "id" => "chat_json",
+        "model" => "gateway-model",
+        "choices" => [
+          %{
+            "message" => %{"role" => "assistant", "content" => "Hello"},
+            "finish_reason" => "stop"
+          }
+        ],
+        "usage" => %{"prompt_tokens" => 4, "completion_tokens" => 1}
+      })
+
+    port = start_server(status: 200, body: body)
+    req = request_for(port) |> Map.put(:endpoint, :chat)
+    events = collect_events(fn callback -> OpenAI.stream(req, callback) end)
+
+    assert [
+             %{type: :delta, content: "Hello"},
+             %{
+               type: :done,
+               status: :completed,
+               meta: %{id: "chat_json", model: "gateway-model"}
+             },
+             %{
+               type: :usage,
+               usage: %{"prompt_tokens" => 4, "completion_tokens" => 1}
+             }
+           ] = events
+  end
+
   test "chat stream emits tool call events" do
     payload = %{
       "id" => "chat_tool",

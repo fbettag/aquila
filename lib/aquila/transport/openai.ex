@@ -102,7 +102,11 @@ defmodule Aquila.Transport.OpenAI do
 
     case Req.request(request) do
       {:ok, %Req.Response{status: status} = response} when status in 200..299 ->
-        state = fetch_state(response, endpoint, callback, ref)
+        state =
+          response
+          |> fetch_state(endpoint, callback, ref)
+          |> flush_buffer()
+          |> maybe_normalize_json_response()
 
         unless state.done? do
           callback.(%{type: :done, status: :completed})
@@ -189,6 +193,23 @@ defmodule Aquila.Transport.OpenAI do
 
   defp assign_status(%{status: nil} = state, status), do: %{state | status: status}
   defp assign_status(state, _status), do: state
+
+  defp flush_buffer(%{buffer: ""} = state), do: state
+  defp flush_buffer(state), do: handle_chunk(state, "\n\n")
+
+  defp maybe_normalize_json_response(%{endpoint: :chat, done?: false, raw_body: body} = state)
+       when is_binary(body) and body != "" do
+    case Jason.decode(body) do
+      {:ok, payload} when is_map(payload) ->
+        {new_state, events} = Chat.normalize_response(state, payload, state.callback)
+        finalize_state(%{new_state | raw_body: ""}, events)
+
+      _other ->
+        state
+    end
+  end
+
+  defp maybe_normalize_json_response(state), do: state
 
   defp handle_chunk(%{buffer: buffer} = state, chunk) do
     data = buffer <> chunk
