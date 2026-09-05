@@ -71,8 +71,8 @@ defmodule Aquila.Engine.Protocol do
   Rebuilds tool messages after detecting format/role incompatibility.
 
   The second parameter is either:
-  - {:format, :text | :tool_result} for tool message format retry
-  - {:role, boolean()} for role compatibility retry (true = tool role, false = function role)
+  - `{:format, :text | :tool_result}` for tool message format retry
+  - `{:role, boolean()}` for role compatibility retry (true = tool role, false = function role)
 
   Returns the updated state with rebuilt messages.
   """

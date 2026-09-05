@@ -5,4 +5,4 @@ Application.put_env(:aquila, Aquila.TestEndpoint,
   pubsub_server: Aquila.TestPubSub
 )
 
-ExUnit.start()
+ExUnit.start(exclude: [:live])

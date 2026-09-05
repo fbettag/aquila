@@ -279,6 +279,7 @@ defmodule Aquila.ToolCompatibilityTest do
     end
 
     for {model, endpoint} <- @parallel_direct_tests do
+      @tag :live
       test "#{model} handles parallel tool calls via direct API (#{endpoint})" do
         config = direct_openai_config!()
         model = unquote(model)
@@ -350,6 +351,7 @@ defmodule Aquila.ToolCompatibilityTest do
     end
 
     for {model, endpoint} <- @retry_direct_tests do
+      @tag :live
       test "#{model} retries tool calls after transient failure via direct API (#{endpoint})" do
         config = direct_openai_config!()
         model = unquote(model)
@@ -421,6 +423,7 @@ defmodule Aquila.ToolCompatibilityTest do
 
   describe "direct OpenAI custom function tool compatibility" do
     for {model, endpoint} <- @direct_compatibility_tests do
+      @tag :live
       test "#{model} accepts and calls custom function tool via direct API (#{endpoint})" do
         config = direct_openai_config!()
         model = unquote(model)

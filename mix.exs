@@ -12,7 +12,12 @@ defmodule Aquila.MixProject do
       aliases: aliases(),
       docs: docs(),
       package: package(),
-      test_coverage: [tool: ExCoveralls],
+      test_coverage: [tool: ExCoveralls]
+    ]
+  end
+
+  def cli do
+    [
       preferred_envs: [
         quality: :test,
         coveralls: :test,
@@ -64,7 +69,12 @@ defmodule Aquila.MixProject do
   defp docs do
     [
       main: "Aquila",
+      source_url: "https://github.com/fbettag/aquila",
+      source_ref: "main",
       extras: [
+        "guides/complete-application.md",
+        "guides/deep-research.md",
+        "guides/testing-matrix.md",
         "guides/overview.md",
         "guides/getting-started.md",
         "guides/streaming-and-sinks.md",
@@ -75,6 +85,9 @@ defmodule Aquila.MixProject do
       ],
       groups_for_extras: [
         Guides: [
+          "guides/complete-application.md",
+          "guides/deep-research.md",
+          "guides/testing-matrix.md",
           "guides/overview.md",
           "guides/getting-started.md",
           "guides/streaming-and-sinks.md",

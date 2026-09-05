@@ -34,6 +34,16 @@ mythological lineup.
   [LiteLLM](https://docs.litellm.ai/docs/) when you need Anthropic, Azure
   OpenAI, or other providers behind an OpenAI-compatible endpoint.
 
+## Releases and documentation
+
+The published Hex package is **0.1.1**. The current tagged source release is **0.1.5**; newer source features require the Git dependency until a new Hex package is published. These are different distribution versions, not interchangeable installation instructions.
+
+- [Hex release](https://hex.pm/packages/aquila) and [HexDocs for 0.1.1](https://hexdocs.pm/aquila/0.1.1/)
+- [Current source guides](guides/overview.md) and [CI documentation artifacts](https://github.com/fbettag/aquila/actions)
+- [Complete support-assistant application](examples/support_assistant): offline demo, tool lookup, streaming, failure handling and deterministic tests.
+
+Created by [Franz Bettag](https://bett.ag/en/franz-bettag), applied AI engineering and AI security in Nürnberg/Fürth. [Engineering case study](https://bett.ag/en/case-studies/aquila).
+
 ## Quick Start
 
 Add Aquila to your dependencies from Hex (preferred) or directly from GitHub:
@@ -41,9 +51,9 @@ Add Aquila to your dependencies from Hex (preferred) or directly from GitHub:
 ```elixir
 def deps do
   [
-    {:aquila, "~> 0.1.2"}
-    # or, for bleeding edge development:
-    # {:aquila, github: "fbettag/aquila"}
+    {:aquila, "~> 0.1.1"}
+    # or use the current tagged source release:
+    # {:aquila, github: "fbettag/aquila", tag: "v0.1.5"}
   ]
 end
 ```
@@ -236,7 +246,7 @@ mix deps.get
 mix compile
 mix quality   # format + coveralls + credo (requires ≥82% coverage)
 mix test      # requires prerecorded cassettes
-mix docs      # generate HTML docs in _build/dev/lib/aquila/doc
+mix docs      # generate current-source HTML documentation in doc/
 ```
 
 ### Live OpenAI Tests
@@ -274,3 +284,5 @@ very welcome!
 MIT License - see [LICENSE](LICENSE) file for details.
 
 Copyright © 2025 Franz Bettag
+
+Current source documentation: [Aquila documentation](https://fbettag.github.io/aquila/), published from successful main-branch CI. HexDocs remains tied to the published Hex release.
