@@ -1,9 +1,10 @@
 # Overview
 
-`Aquila` is a minimal Elixir interface for OpenAI-compatible Responses and Chat
-Completions endpoints. The library covers both synchronous and streaming
-workflows behind a unified prompt API and tool orchestration loop, and it fits
-cleanly inside background processors such as Oban without any custom wrappers.
+`Aquila` is an Elixir interface for OpenAI-compatible Responses and Chat
+Completions endpoints and TypeSafe System One judgments. The library covers
+both synchronous and streaming workflows behind a unified prompt API and tool
+orchestration loop, and it fits cleanly inside background processors such as
+Oban without any custom wrappers.
 
 > Why “Aquila”? Aquila is Latin for *eagle*—a nod to the project’s goal of
 > providing sharp vision over AI responses while matching the mythological
@@ -47,6 +48,8 @@ cleanly inside background processors such as Oban without any custom wrappers.
   (`Record`), and deterministic playback (`Replay`).
 - `Aquila.Sink` – helpers for pushing streaming events to processes or callback
   functions.
+- `Aquila.TypeSafe` – typed `choice`, `score`, and `noul` judgments through
+  TypeSafe System One models such as Jev.
 
 ## Feature Matrix
 
@@ -61,6 +64,7 @@ cleanly inside background processors such as Oban without any custom wrappers.
 | Response storage | `Aquila`, `Aquila.Engine` | `store: true` persists Responses output |
 | Retrieve/delete stored responses | `Aquila`, `Aquila.Transport.Record` | Helpers fetch and purge stored conversations, recorder tracks GET/DELETE |
 | Audio transcription | `Aquila` | `transcribe_audio/2` posts multipart payloads to `/audio/transcriptions` |
+| Typed judgments | `Aquila.TypeSafe` | Closed-set decisions and probabilities without generated JSON |
 
 ## Multi-Provider Access via LiteLLM
 
@@ -75,6 +79,8 @@ you target.
 
 - Read the [Getting Started](getting-started.md) guide for configuration and
   first requests.
+- Use [TypeSafe Jev](typesafe-jev.md) for classification, ranking, relevance,
+  routing, and evidence checks.
 - Explore [Streaming and Sinks](streaming-and-sinks.md) to wire chunks into
   UI layers or background consumers.
 - Follow [LiveView Integration](liveview-integration.md) for real-time UI

@@ -4,7 +4,7 @@ defmodule Aquila.MixProject do
   def project do
     [
       app: :aquila,
-      version: "0.1.5",
+      version: "0.2.0",
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -77,6 +77,7 @@ defmodule Aquila.MixProject do
         "guides/testing-matrix.md",
         "guides/overview.md",
         "guides/getting-started.md",
+        "guides/typesafe-jev.md",
         "guides/streaming-and-sinks.md",
         "guides/cassettes-and-testing.md",
         "guides/liveview-integration.md",
@@ -90,6 +91,7 @@ defmodule Aquila.MixProject do
           "guides/testing-matrix.md",
           "guides/overview.md",
           "guides/getting-started.md",
+          "guides/typesafe-jev.md",
           "guides/streaming-and-sinks.md",
           "guides/cassettes-and-testing.md",
           "guides/liveview-integration.md",
@@ -103,7 +105,7 @@ defmodule Aquila.MixProject do
   defp package do
     [
       description:
-        "Batteries-included Elixir library for OpenAI-compatible Responses and Chat Completions APIs",
+        "Elixir adapters for OpenAI-compatible generation and TypeSafe System One judgments",
       licenses: ["MIT"],
       links: %{
         "GitHub" => "https://github.com/fbettag/aquila"

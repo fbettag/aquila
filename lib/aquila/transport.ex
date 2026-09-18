@@ -10,7 +10,7 @@ defmodule Aquila.Transport do
   """
 
   @type req :: %{
-          required(:endpoint) => :responses | :chat,
+          required(:endpoint) => :responses | :chat | :system_one | :typesafe_models,
           required(:url) => String.t(),
           optional(:body) => map() | nil,
           optional(:headers) => [{String.t(), String.t()}],

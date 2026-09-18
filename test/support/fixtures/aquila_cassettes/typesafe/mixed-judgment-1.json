@@ -1,0 +1,40 @@
+{
+  "answers": {
+    "claim_type": {
+      "choice": "effect",
+      "confidence": 1.0,
+      "probabilities": {
+        "descriptive": 0.0,
+        "effect": 1.0,
+        "mechanism": 0.0
+      },
+      "type": "choice"
+    },
+    "passage_supports_claim": {
+      "noul": 0.02,
+      "type": "noul"
+    },
+    "source_relevance": {
+      "confidence": 0.64,
+      "legend": {
+        "0": "Unrelated",
+        "1": "Topically adjacent",
+        "2": "Directly useful context",
+        "3": "Core outcome evidence"
+      },
+      "probabilities": {
+        "0": 0.01,
+        "1": 0.31,
+        "2": 0.66,
+        "3": 0.02
+      },
+      "score": 1.68,
+      "type": "score"
+    }
+  },
+  "model": "jev-1.13.0",
+  "usage": {
+    "input_tokens": 558,
+    "output_tokens": 81
+  }
+}

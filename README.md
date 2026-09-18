@@ -1,10 +1,10 @@
 # Aquila
 
 Aquila is a batteries-included Elixir library for orchestrating OpenAI-compatible
-Responses and Chat Completions APIs (including proxies that mimic them). The
-name comes from the Latin word for *eagle*—a nod to the sharp perspective we
-want over streaming responses and a friendly companion to Phoenix in Elixir’s
-mythological lineup.
+Responses and Chat Completions APIs (including proxies that mimic them), plus
+typed TypeSafe System One judgments. The name comes from the Latin word for
+*eagle*—a nod to the sharp perspective we want over streaming responses and a
+friendly companion to Phoenix in Elixir’s mythological lineup.
 
 ## Highlights
 
@@ -22,6 +22,8 @@ mythological lineup.
 - **Deep Research workflows** – orchestrate OpenAI Deep Research models with
   `Aquila.deep_research_*` helpers, record cassette-backed fixtures, and stream
   progress into LiveView.
+- **Typed Jev judgments** – ask TypeSafe System One closed-set `choice`, ordered
+  `score`, and probabilistic `noul` questions without parsing generated JSON.
 - **Deterministic fixtures** – recorder/replay transports capture request and
   streaming payloads, canonicalise prompts, and fail loudly if recordings drift.
 - **Response storage** – pass `store: true` to opt-in to OpenAI’s managed
@@ -36,7 +38,7 @@ mythological lineup.
 
 ## Releases and documentation
 
-The published Hex package is **0.1.1**. The current tagged source release is **0.1.5**; newer source features require the Git dependency until a new Hex package is published. These are different distribution versions, not interchangeable installation instructions.
+The published Hex package is **0.1.1**. The current tagged source release is **0.2.0**; newer source features require the Git dependency until a new Hex package is published. These are different distribution versions, not interchangeable installation instructions.
 
 - [Hex release](https://hex.pm/packages/aquila) and [HexDocs for 0.1.1](https://hexdocs.pm/aquila/0.1.1/)
 - [Current source guides](guides/overview.md) and [CI documentation artifacts](https://github.com/fbettag/aquila/actions)
@@ -53,7 +55,7 @@ def deps do
   [
     {:aquila, "~> 0.1.1"}
     # or use the current tagged source release:
-    # {:aquila, github: "fbettag/aquila", tag: "v0.1.5"}
+    # {:aquila, github: "fbettag/aquila", tag: "v0.2.0"}
   ]
 end
 ```
@@ -68,6 +70,11 @@ config :aquila, :openai,
   transcription_model: "gpt-4o-mini-transcribe",
   request_timeout: 30_000
 
+config :aquila, :typesafe,
+  api_key: {:system, "TYPESAFE_API_KEY"},
+  default_model: "jev-latest",
+  request_timeout: 60_000
+
 config :aquila, :recorder,
   path: "test/support/fixtures/aquila_cassettes",
   transport: Aquila.Transport.OpenAI
@@ -79,6 +86,33 @@ Ask a model:
 iex> Aquila.ask("Explain OTP supervision", instructions: "Keep it short.").text
 "OTP supervision arranges workers into a restartable tree..."
 ```
+
+Ask Jev for typed judgments:
+
+```elixir
+alias Aquila.TypeSafe
+alias Aquila.TypeSafe.Question
+
+questions = %{
+  route: Question.choice("Choose the best route.", %{
+    "science" => "Scientific evidence",
+    "business" => "Business or market intelligence"
+  }),
+  relevance: Question.score("How relevant is the source?", [
+    "Unrelated",
+    "Adjacent",
+    "Directly useful",
+    "Core evidence"
+  ]),
+  supported: Question.noul("Does the passage support the claim as written?")
+}
+
+{:ok, result} = TypeSafe.evaluate(%{claim: claim, passage: passage}, questions)
+result.answers["supported"].probability
+```
+
+See [TypeSafe Jev](guides/typesafe-jev.md) for configuration, return types,
+testing, and guidance on where typed judgments fit.
 
 Stream results:
 
@@ -230,11 +264,12 @@ provider it supports.
 
 ## Project Layout
 
-- `lib/aquila.ex` – public API (`ask/2`, `stream/2`, `retrieve_response/2`,
+- `lib/aquila.ex` – generative API (`ask/2`, `stream/2`, `retrieve_response/2`,
   `delete_response/2`, `transcribe_audio/2`, `deep_research_*`).
 - `lib/aquila/engine.ex` – orchestration, streaming loop, tool integration.
 - `lib/aquila/transport/` – HTTP adapter, recorder, replay utilities.
 - `lib/aquila/sink.ex` – sink helpers for delivering streaming events.
+- `lib/aquila/type_safe.ex` – typed TypeSafe System One/Jev API.
 - `guides/` – HexDocs extras covering setup, streaming, cassette usage,
   LiveView, Oban, LiteLLM, and code quality.
 - `test/` – cassette-backed unit tests and streaming transport coverage.

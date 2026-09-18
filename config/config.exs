@@ -13,4 +13,10 @@ config :aquila, :openai,
   transcription_model: "gpt-4o-mini-transcribe",
   request_timeout: 30_000
 
+config :aquila, :typesafe,
+  base_url: "https://api.typesafe.ai/v1",
+  api_key: nil,
+  default_model: "jev-latest",
+  request_timeout: 60_000
+
 import_config "#{config_env()}.exs"
